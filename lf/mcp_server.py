@@ -11,7 +11,7 @@ JSON-RPC 2.0 and the server needs four methods: initialize, tools/list, tools/ca
 The data folder holds customers/, .env, lf_settings.yaml and the issue folders. Code,
 templates and holidays come with the package. Register in claude_desktop_config.json:
     "dosirak-letter": {"command": "C:\\Users\\user\\.local\\bin\\uvx.exe",
-                       "args": ["--from", "git+https://github.com/00dosi/letter-factory",
+                       "args": ["--from", "https://github.com/00dosi/letter-factory/archive/refs/heads/main.zip",
                                 "letter-factory-mcp", "--root", "H:\\...\\00 뉴스레터 자동화"],
                        "env": {"PYTHONUTF8": "1"}}
 """

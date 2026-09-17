@@ -5,22 +5,22 @@
 
 ## 설치 (Claude 데스크톱, PC마다 한 번)
 
-1. [uv](https://docs.astral.sh/uv/) 설치: PowerShell에서 `winget install -e --id astral-sh.uv`
+1. [uv](https://docs.astral.sh/uv/) 설치: PowerShell에서 `winget install -e --id astral-sh.uv`. Git·파이썬은 필요 없다(zip 아카이브로 받고, 파이썬은 uv가 내려받는다). uvx.exe 위치는 `where uvx` 또는 winget 패키지 폴더 `%LOCALAPPDATA%\Microsoft\WinGet\Packages\astral-sh.uv_…\uvx.exe`
 2. 처음 한 번 미리 받아 두기 (첫 실행은 파이썬과 패키지를 내려받아 1~2분 걸린다):
    ```
-   uvx --from git+https://github.com/00dosi/letter-factory letter-factory-mcp --root "<데이터 폴더>"
+   uvx --from https://github.com/00dosi/letter-factory/archive/refs/heads/main.zip letter-factory-mcp --root "<데이터 폴더>"
    ```
    다운로드가 끝나면 입력을 기다리며 멈춘다. 정상이며 Ctrl+C 로 끝낸다.
 3. `claude_desktop_config.json` 의 `mcpServers` 에 추가하고 앱을 완전히 재시작한다:
    ```json
    "dosirak-letter": {
-     "command": "C:\\Users\\<사용자>\\.local\\bin\\uvx.exe",
-     "args": ["--from", "git+https://github.com/00dosi/letter-factory", "letter-factory-mcp",
+     "command": "C:\\Users\\<사용자>\\AppData\\Local\\Microsoft\\WinGet\\Packages\\astral-sh.uv_Microsoft.Winget.Source_8wekyb3d8bbwe\\uvx.exe",
+     "args": ["--from", "https://github.com/00dosi/letter-factory/archive/refs/heads/main.zip", "letter-factory-mcp",
               "--root", "H:\\...\\00 뉴스레터 자동화"],
      "env": {"PYTHONUTF8": "1"}
    }
    ```
-4. 새 버전을 받으려면 `uvx --refresh --from git+https://github.com/00dosi/letter-factory letter-factory-mcp --root "<데이터 폴더>"` 를 한 번 실행한다.
+4. 새 버전을 받으려면 `uvx --refresh --from https://github.com/00dosi/letter-factory/archive/refs/heads/main.zip letter-factory-mcp --root "<데이터 폴더>"` 를 한 번 실행한다.
 
 ## MCP 도구
 
