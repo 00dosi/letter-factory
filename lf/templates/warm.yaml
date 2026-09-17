@@ -1,0 +1,13 @@
+# 친근·따뜻한 에디터톤 — 종이색 바탕, 둥근 카드, 명조 제목, 넉넉한 줄간격.
+label: 친근·따뜻한 에디터톤
+accent: "#9a5b2e"
+font: "'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif"
+heading_font: "'Nanum Myeongjo','AppleMyungjo','Batang',serif"
+section: "padding:28px 38px 6px;font-family:{font};"
+h2: "margin:0 0 14px;font-family:{heading_font};font-size:21px;font-weight:700;line-height:1.4;color:{section_accent};"
+h3: "margin:18px 0 8px;font-size:14px;font-weight:700;color:#8a6f57;"
+p: "margin:0 0 16px;font-size:15px;line-height:1.95;color:#3b3029;"
+ul: "margin:0 0 18px;padding-left:20px;"
+li: "margin:0 0 12px;font-size:15px;line-height:1.75;color:#3b3029;"
+link: "color:{section_accent};text-decoration:underline;"
+callout: "margin:6px 0 18px;padding:15px 18px;background:#fbf3e6;border-radius:12px;font-size:14px;line-height:1.85;color:#5a4636;"

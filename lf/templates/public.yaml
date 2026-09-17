@@ -1,0 +1,12 @@
+# 신뢰감·공공풍 — 진한 색 머리띠, 옅은 색 바탕의 섹션 제목, 항목 사이 구분선.
+label: 신뢰감·공공풍
+accent: "#10396E"
+font: "'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif"
+section: "padding:26px 32px 6px;font-family:{font};"
+h2: "margin:0 0 12px;padding:10px 14px;background:{tint};border-left:4px solid {section_accent};font-size:17px;font-weight:700;color:{deep};"
+h3: "margin:20px 0 6px;padding:0 0 6px;border-bottom:1px solid #d6dce4;font-size:14px;font-weight:700;color:{deep};"
+p: "margin:0 0 14px;font-size:15px;line-height:1.75;color:#222222;"
+ul: "margin:0 0 16px;padding-left:20px;"
+li: "margin:0;padding:9px 0;border-bottom:1px dashed #d6dce4;font-size:15px;line-height:1.6;color:#222222;"
+link: "color:{deep};text-decoration:underline;font-weight:600;"
+callout: "margin:8px 0 16px;padding:13px 16px;background:#f4f6f9;border:1px solid #d6dce4;font-size:14px;line-height:1.7;color:#333333;"

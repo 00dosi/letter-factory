@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4ede1;">
+<span style="display:none;max-height:0;overflow:hidden;opacity:0;">{{ preheader }}</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4ede1;">
+  <tr>
+    <td align="center" style="padding:30px 10px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#fffdf8;border-radius:16px;">
+        <tr>
+          <td align="center" style="padding:40px 38px 18px;font-family:{{ font }};text-align:center;">
+            {% if logo_url %}<img src="{{ logo_url }}" alt="{{ org_name }}" height="34" style="display:block;height:34px;border:0;margin:0 auto 18px;">{% endif %}
+            <div style="font-size:12px;letter-spacing:2px;color:#a08a74;">{{ issue_label }}{% if issue_label %} · {% endif %}{{ date_label }}</div>
+            <h1 style="margin:12px 0 0;font-family:{{ heading_font }};font-size:27px;line-height:1.45;font-weight:700;color:#3b3029;">{{ title }}</h1>
+            <div style="margin:16px 0 0;font-size:14px;letter-spacing:6px;color:{{ accent }};">· · ·</div>
+          </td>
+        </tr>
+        {% for row in blocks %}{{ row }}
+        {% endfor %}
+        <tr>
+          <td align="center" style="padding:24px 38px 36px;font-family:{{ font }};font-size:12px;line-height:1.8;color:#a08a74;text-align:center;">{{ footer }}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

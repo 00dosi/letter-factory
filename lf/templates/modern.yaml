@@ -1,0 +1,12 @@
+# 모던·미니멀 — 흰 바탕, 넓은 여백, 얇은 선. 색은 섹션 제목 밑줄에만.
+label: 모던·미니멀
+accent: "#1f2933"
+font: "'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif"
+section: "padding:34px 40px 2px;font-family:{font};"
+h2: "margin:0 0 18px;padding:0 0 10px;border-bottom:2px solid {section_accent};font-size:14px;font-weight:700;letter-spacing:0.5px;color:{section_accent};"
+h3: "margin:22px 0 8px;font-size:13px;font-weight:700;color:#6b7280;"
+p: "margin:0 0 15px;font-size:15px;line-height:1.85;color:#1f2933;"
+ul: "margin:0 0 18px;padding-left:18px;"
+li: "margin:0 0 11px;font-size:15px;line-height:1.65;color:#1f2933;"
+link: "color:#1f2933;text-decoration:underline;"
+callout: "margin:6px 0 18px;padding:14px 18px;border:1px solid #e5e7eb;font-size:14px;line-height:1.75;color:#374151;"

@@ -1,0 +1,15 @@
+# 컬러풀·발랄 — 세 가지 색 띠, 섹션마다 색이 바뀌는 둥근 라벨 제목.
+# accents 의 첫 색은 고객 대표색, 나머지는 고정 보조색 (흰 글자 대비 확인한 값).
+label: 컬러풀·발랄
+accent: "#e8553a"
+accent2: "#13998a"
+accents: ["{accent}", "{accent2}", "#b86e00", "#5b4ee0"]
+font: "'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif"
+section: "padding:26px 30px 6px;font-family:{font};"
+h2: "display:inline-block;margin:0 0 14px;padding:7px 16px;border-radius:999px;background:{section_accent};font-size:16px;font-weight:700;line-height:1.3;color:#ffffff;"
+h3: "margin:18px 0 8px;font-size:14px;font-weight:800;color:{section_accent};"
+p: "margin:0 0 14px;font-size:15px;line-height:1.8;color:#222222;"
+ul: "margin:0 0 16px;padding-left:20px;"
+li: "margin:0 0 10px;font-size:15px;line-height:1.6;color:#222222;"
+link: "color:#1f2933;text-decoration:underline;font-weight:600;"
+callout: "margin:6px 0 16px;padding:14px 16px;background:#fff4d1;border-radius:14px;font-size:14px;line-height:1.75;color:#4a3b00;"
