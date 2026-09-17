@@ -37,7 +37,7 @@ class BodyParser(HTMLParser):
             if tag == "img":
                 src = a.get("data-lazy-src") or a.get("src") or ""
                 if src and "pstatic.net" in src and ("se-image-resource" in cls or "phinf" in src or "postfiles" in src or "blogfiles" in src):
-                    self.images.append(re.sub(r"\?type=.*$", "", src))
+                    self.images.append(sized(src))
                     self.parts.append(f"\n[이미지 {len(self.images)}]\n")
             if tag in ("p", "br", "li", "h1", "h2", "h3", "h4"):
                 self.parts.append("\n")
@@ -56,6 +56,43 @@ class BodyParser(HTMLParser):
             self.parts.append(data)
 
 
+IMG_HOSTS = ("mblogthumb-phinf.pstatic.net", "blogthumb.pstatic.net", "postfiles.pstatic.net", "blogfiles.pstatic.net")
+
+
+def sized(src):
+    """Naver thumbnail URLs only answer with a size parameter (the bare URL is 404);
+    w773 is the SmartEditor body width and ~150 KB — right for email."""
+    base = re.sub(r"\?type=.*$", "", src).replace("(", "%28").replace(")", "%29")  # parens break markdown links
+    return base + "?type=w773" if "mblogthumb-phinf" in base or "postfiles" in base or "blogfiles" in base else src
+
+
+def page_images(raw):
+    """All body images as a fallback when the container walk misses them: lazy-src first."""
+    found = []
+    for src in re.findall(r'(?:data-lazy-src|src)="(https://[^"]+)"', raw):
+        src = html.unescape(src)
+        if any(h in src for h in IMG_HOSTS[:1] + IMG_HOSTS[2:]) and "_blur" not in src:
+            u = sized(src)
+            if u not in found:
+                found.append(u)
+    return found
+
+
+def representative_image(raw):
+    """The author's 대표 이미지 is og:image (a blogthumb URL). Prefer the same picture's
+    mblogthumb body URL at w773 (~150 KB); fall back to og:image itself (loads without Referer)."""
+    og = re.search(r'property="og:image"\s+content="([^"]+)"', raw)
+    if not og:
+        return ""
+    og_url = html.unescape(og.group(1))
+    key = re.search(r"pstatic\.net/([^/]+/[^/.]+)", og_url)
+    if key:
+        m = re.search(r'"(https://mblogthumb-phinf\.pstatic\.net/' + re.escape(key.group(1)) + r'[^"]+)"', raw)
+        if m:
+            return sized(html.unescape(m.group(1)))
+    return og_url
+
+
 def read_post(blog_id, post_id):
     url = f"https://m.blog.naver.com/{blog_id}/{post_id}"
     r = requests.get(url, headers=UA, timeout=25)
@@ -65,6 +102,8 @@ def read_post(blog_id, post_id):
     date = re.search(r"(20\d{2}\. ?\d{1,2}\. ?\d{1,2}\.)", raw)
     parser = BodyParser()
     parser.feed(raw)
+    images = parser.images or page_images(raw)
+    thumbnail = representative_image(raw) or (images[0] if images else "")
     text = html.unescape("".join(parser.parts))
     text = re.sub(r"[ \t​]+", " ", text)
     text = re.sub(r"\n\s*\n+", "\n\n", text).strip()
@@ -72,7 +111,8 @@ def read_post(blog_id, post_id):
         "url": f"https://blog.naver.com/{blog_id}/{post_id}",
         "title": html.unescape(title.group(1)).strip() if title else "",
         "date": date.group(1).strip() if date else "",
-        "images": parser.images,
+        "images": images,
+        "thumbnail": thumbnail,
         "body": text,
         "found_container": "se-main-container" in raw,
     }
@@ -102,7 +142,8 @@ def main():
         if not post["found_container"] or len(post["body"]) < 100:
             print(f"  ✗ {pid}: 본문 컨테이너 없음/짧음 ({len(post['body'])}자) — 브라우저로 열어 확인")
         out = folder / f"{pid}.md"
-        lines = [f"# {post['title']}", f"- URL: {post['url']}", f"- 게시일: {post['date']}", f"- 본문 {len(post['body'])}자 · 이미지 {len(post['images'])}장", ""]
+        lines = [f"# {post['title']}", f"- URL: {post['url']}", f"- 게시일: {post['date']}", f"- 본문 {len(post['body'])}자 · 이미지 {len(post['images'])}장",
+                 f"- 대표 이미지: {post['thumbnail']}" if post["thumbnail"] else "- 대표 이미지: 없음", ""]
         lines += [f"- 이미지 {i}: {u}" for i, u in enumerate(post["images"], 1)]
         lines += ["", "## 본문", "", post["body"]]
         out.write_text("\n".join(lines), encoding="utf-8")

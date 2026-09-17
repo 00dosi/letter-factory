@@ -27,7 +27,9 @@ from lf.common import PKG, customer_dir, issue_dir, load_yaml
 
 # [text](url) where text may itself contain [brackets], e.g. [[기획] 제목](url)
 LINK = re.compile(r"\[((?:[^\[\]]|\[[^\[\]]*\])+)\]\((https?://[^)\s]+)\)")
-BLOCK_KEYS = ("section", "h2", "h3", "p", "ul", "li", "link", "callout")
+BLOCK_KEYS = ("section", "h2", "h3", "p", "ul", "li", "link", "callout", "image")
+# a line that is only an image, optionally wrapped in a link: ![alt](img) / [![alt](img)](url)
+IMAGE = re.compile(r"^(?:\[)?!\[([^\]]*)\]\((https?://\S+?)\)(?:\]\((https?://\S+?)\))?$")
 
 
 def split_front_matter(text):
@@ -115,6 +117,11 @@ def blocks(body, style):
         elif line.startswith("> "):
             flush()
             current["html"].append(f'<p style="{css["callout"]}">{inline(line[2:], css["link"])}</p>')
+        elif IMAGE.match(line):
+            flush()
+            alt, src, href = IMAGE.match(line).groups()
+            img = f'<img src="{html.escape(src)}" alt="{html.escape(alt)}" width="600" style="{css["image"]}">'
+            current["html"].append(f'<a href="{html.escape(href)}">{img}</a>' if href else img)
         else:
             if items:
                 flush()

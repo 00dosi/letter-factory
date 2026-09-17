@@ -17,7 +17,7 @@ import requests
 import urllib3
 
 from lf.common import UA, issue_dir
-from lf.render import LINK, split_front_matter
+from lf.render import IMAGE, LINK, split_front_matter
 
 DEADLINE = re.compile(r"~\s?(?:(20\d{2})[.\-/])?(\d{1,2})[./\-](\d{1,2})")
 BANNED = ["Claude", "클로드", "AI가", "AI 분석", "인공지능이 작성", "!!"]
@@ -38,6 +38,21 @@ def link_status(url):
     return url, "broken", code
 
 
+def image_status(url):
+    """Email clients fetch images with no Referer: check the URL answers with an image that way."""
+    try:
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20, stream=True, verify=False)
+        ctype, size = r.headers.get("Content-Type", ""), int(r.headers.get("Content-Length") or 0)
+        r.close()
+    except requests.RequestException as exc:
+        return url, "broken", exc.__class__.__name__
+    if r.status_code != 200 or not ctype.startswith("image/"):
+        return url, "broken", f"{r.status_code} {ctype}"
+    if size > 1_000_000:
+        return url, "manual", f"{size // 1000}KB — 너무 큼, ?type=w773 같은 축소 주소로"
+    return url, "ok", f"{ctype} {size // 1000}KB"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("customer")
@@ -54,6 +69,8 @@ def main():
     for number, line in enumerate(body.splitlines(), 1):
         if line.startswith("## "):
             section = line
+        if IMAGE.match(line.strip()):
+            continue  # image line: the picture is checked below; its wrapper link repeats the title link on purpose
         for title, url in LINK.findall(line):
             urls.append(url)
             placed.append((section, url))
@@ -84,10 +101,16 @@ def main():
             elif verdict == "manual":
                 manual.append(f"직접 확인 ({detail}): {url}")
 
-    report = {"links": len(set(urls)), "cutoff": cutoff.isoformat(), "problems": problems, "manual": manual}
+    images = [m.group(2) for m in (IMAGE.match(l.strip()) for l in body.splitlines()) if m]
+    for url, verdict, detail in map(image_status, dict.fromkeys(images)):
+        if verdict == "broken":
+            problems.append(f"이미지 안 열림 ({detail}): {url}")
+        elif verdict == "manual":
+            manual.append(f"이미지 확인 ({detail}): {url}")
+    report = {"links": len(set(urls)), "images": len(set(images)), "cutoff": cutoff.isoformat(), "problems": problems, "manual": manual}
     (folder / "checks.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"링크 {report['links']}개 · 마감 기준일 {cutoff}")
+    print(f"링크 {report['links']}개 · 이미지 {report['images']}개 · 마감 기준일 {cutoff}")
     for line in problems:
         print(f"  고칠 것: {line}")
     for line in manual:
