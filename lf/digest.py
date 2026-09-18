@@ -34,7 +34,12 @@ NOTLEAD = re.compile(r"선정|확정|수상|결과|마감했|성료|개최했|�
 
 
 def url_key(url):
-    p = urlparse(url)
+    """Comparable form of a URL; None if it is not one (a stray '[' from pasted markdown
+    makes urlparse raise 'Invalid IPv6 URL')."""
+    try:
+        p = urlparse(url)
+    except ValueError:
+        return None
     q = [(k, v) for k, v in parse_qsl(p.query) if not k.startswith(("utm_", "ref", "sc", "input"))]
     return urlunparse((p.scheme, p.netloc.replace("www.", ""), p.path, "", urlencode(q), ""))
 
@@ -88,6 +93,7 @@ def main():
 
     prev_file = folder / "prev_issue_urls.txt"
     prev = {url_key(l.strip()) for l in prev_file.read_text(encoding="utf-8").splitlines() if l.strip().startswith("http")} if prev_file.exists() else set()
+    prev.discard(None)
     used_file = cdir / "blog_used_ids.txt"
     used_ids = set(re.findall(r"\b(\d{12})\b", used_file.read_text(encoding="utf-8"))) if used_file.exists() else set()
     used_ids |= {re.search(r"/(\d+)$", u).group(1) for u in prev if "blog.naver.com/00dosi/" in u and re.search(r"/(\d+)$", u)}
