@@ -26,7 +26,8 @@
 
 | 도구 | 하는 일 |
 |---|---|
-| `lf_run(name, args)` | 데이터 폴더에서 `python -m lf.<name> <args>` 실행. name: status · env_check · new_issue · naver_news · boards · prev_issue · digest · quality · blog · checks · render · stibee · sync |
+| `lf_run(name, args)` | 데이터 폴더에서 `python -m lf.<name> <args>` 실행. name: status · env_check · new_issue · naver_news · boards · prev_issue · digest · quality · blog · checks · render · stibee · sync. **긴 단계(naver_news · boards · quality · digest)는 백그라운드로 띄우고 즉시 `{run_id, status: running}`을 돌려준다** — Cowork 브리지가 도구 호출을 약 60초만 기다리기 때문. 같은 단계가 도는 중이면 `already_running` |
+| `lf_status(run_id)` 또는 `lf_status(step, customer, send_date)` | 백그라운드 단계의 상태: running / done / failed, exit_code, 출력 마지막 20줄. 기록은 `<호 폴더>/_run/<단계>.json`(+ `.log`, `.stderr.log`). 프로세스가 없고 30분 넘게 running이면 stale로 보고 다시 띄운다 |
 | `read_text(path)` | 데이터 폴더 안 텍스트 파일 읽기 (`.env` 제외) |
 | `write_text(path, content)` | 데이터 폴더 안에 텍스트 파일 쓰기 (`.env`·폴더 밖 거부) |
 | `list_dir(path)` | 폴더 내용 나열 |
@@ -40,6 +41,7 @@
   customers/<slug>/profile.yaml 고객 정보·어조·코너·템플릿·발송일·호 번호
   customers/<slug>/sources.yaml 검색어·게시판·품질 규칙
   customers/<slug>/issues/<발송일>/   (기본 호 폴더) issue.yaml → candidates_*.json → digest → selection → draft.md → letter.html
+                                    _run/  백그라운드 단계의 상태·로그 (원자료, 드라이브에 올리지 않음)
 ```
 
 ## 개발
