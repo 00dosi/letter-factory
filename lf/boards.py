@@ -219,16 +219,27 @@ def filter_posts(posts, exclude=None, require_any=None):
     return kept, len(posts) - len(kept)
 
 
-def outside_window(posts, since, cutoff):
-    """Drop posts that are old and closed: earliest date (posting date) before `since` AND latest date
-    (deadline guess) before `cutoff`. A single date counts as the posting date. Returns (kept, dropped)."""
-    kept = []
+def outside_window(posts, since, cutoff, oldest):
+    """Posts posted before `since` (earliest date = posting date; a single date is the posting date):
+    - a deadline-looking later date before `cutoff` → dropped (closed)
+    - posting date before `oldest` (a year back) → dropped (stale search results from past years)
+    - otherwise kept with outside_window: True, for the editor to judge as a re-post candidate (운영원칙 §4-7).
+    Returns (kept, counts) with counts = {outside, kept, expired, closed}."""
+    kept, counts = [], {"outside": 0, "kept": 0, "expired": 0, "closed": 0}
     for post in posts:
         dates = sorted(post.get("dates") or [])
-        if dates and dates[0] < since and dates[-1] < cutoff:
+        if not dates or dates[0] >= since:
+            kept.append(post)
             continue
-        kept.append(post)
-    return kept, len(posts) - len(kept)
+        counts["outside"] += 1
+        if dates[0] < oldest:
+            counts["expired"] += 1
+        elif len(dates) > 1 and dates[-1] < cutoff:
+            counts["closed"] += 1
+        else:
+            counts["kept"] += 1
+            kept.append({**post, "outside_window": True})
+    return kept, counts
 
 
 def extract_json(payload, fields, keywords, detail_url=None):
@@ -269,6 +280,7 @@ def main():
     send = dt.date.fromisoformat(args.send_date)
     since = send - dt.timedelta(days=sources.get("window_days", 14))
     cutoff = send + dt.timedelta(days=1)  # deadline rule: a notice must still be open the day after sending
+    oldest = send - dt.timedelta(days=365)  # older postings are stale search results, never re-post candidates
     window = {"{since}": since.strftime("%Y%m%d"), "{until}": send.strftime("%Y%m%d")}
 
     def fill(value):
@@ -309,13 +321,13 @@ def main():
                     response.text, response.url, keywords,
                     board.get("detail_url"), board.get("detail_id_pattern"), board.get("title_cell"),
                 )
-            posts, entry["outside_window"] = outside_window(posts, since.isoformat(), cutoff.isoformat())
+            posts, entry["outside_window"] = outside_window(posts, since.isoformat(), cutoff.isoformat(), oldest.isoformat())
             posts, entry["filtered_out"] = filter_posts(posts, board.get("exclude"), board.get("require_any"))
             for index, post in enumerate(posts, 1):
                 post["id"] = f"B{number}-{index}"
             entry["posts"] = posts
             # Filtered down to nothing is still a good answer, so "ok" + filtered_out, not no_posts_found.
-            found = posts or entry["filtered_out"] or entry["outside_window"]
+            found = posts or entry["filtered_out"] or entry["outside_window"]["outside"]
             entry["status"] = "ok" if response.ok and found else ("no_posts_found" if response.ok else "http_error")
         except (requests.RequestException, ValueError) as exc:
             error = str(exc)
@@ -323,7 +335,10 @@ def main():
                 error += " " + LEGACY_HINT
             entry.update(status="fetch_failed", error=error, posts=[])
         results.append(entry)
-        dropped = (f" (기간 밖 {entry['outside_window']}건)" if entry.get("outside_window") else "") + (f" (필터 제외 {entry['filtered_out']}건)" if entry.get("filtered_out") else "")
+        ow = entry.get("outside_window") or {}
+        dropped = ((f" (기간 밖 {ow['outside']}건 — 재게재 후보 {ow['kept']}건 남김, 1년 넘은 글 {ow['expired']}건 제외"
+                    + (f", 마감 지남 {ow['closed']}건 제외" if ow["closed"] else "") + ")") if ow.get("outside") else "")
+        dropped += f" (필터 제외 {entry['filtered_out']}건)" if entry.get("filtered_out") else ""
         print(f"  [{entry['status']}] {board['name']}: 게시글 {len(entry['posts'])}건{dropped}")
 
     out = folder / "candidates_boards.json"

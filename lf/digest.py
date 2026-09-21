@@ -57,6 +57,29 @@ def jaccard(a, b):
     return len(a & b) / max(1, len(a | b))
 
 
+def board_section(boards):
+    """[5] board posts by category, then posts posted before the collection window under their own heading
+    (still open or undated — the editor decides whether to re-post them, 운영원칙 §4-7)."""
+    def line(board, post):
+        dates = post.get("dates") or []
+        link = f"[{post['title']}]({post['url']})" if post.get("url") else f"{post['title']} (게시글 URL 없음 — 게시판 URL + 제목으로)"
+        deadline = f" ~{dates[-1]}" if len(dates) > 1 else ""
+        return f"- {post['id']} | {dates[0][5:] if dates else '--'} | ({board['board']}) {link}{deadline}"
+
+    fresh = collections.defaultdict(list)
+    repost = []
+    for board in boards:
+        for post in board.get("posts", []):
+            (repost if post.get("outside_window") else fresh[board.get("category") or "기타"]).append(line(board, post))
+    total = sum(len(v) for v in fresh.values())
+    out = [f"\n## [5] 게시판 공고 {total}건 (수집 기간 안 게시 · 마감일은 원문에서 확인)\n"]
+    for category, lines in fresh.items():
+        out += [f"### {category} {len(lines)}건", *lines, ""]
+    out.append(f"### 재게재 후보(수집 기간 전 게시) {len(repost)}건 — 아직 유효하면 실을지 담당자가 정한다")
+    out += repost or ["- 없음"]
+    return out
+
+
 def blog_candidates(rss_url, used_ids):
     try:
         xml = requests.get(rss_url, headers=UA, timeout=25).text
@@ -152,6 +175,10 @@ def main():
     out.append(f"\n## [5] 뉴스에서 나온 공고 단서 {len(leads)}건 (마감일은 게시판·원문에서 확인)\n")
     for r in leads[:40]:
         out.append(f"- {r['id']} | {r['published'][5:]} | ({r['host']}) [{r['title']}]({r['url']}) · {r['axis']}")
+
+    boards_file = folder / "candidates_boards.json"
+    if boards_file.exists():
+        out += board_section(json.loads(boards_file.read_text(encoding="utf-8"))["boards"])
 
     since = news_file.get("since") or (dt.date.fromisoformat(args.send_date) - dt.timedelta(days=sources.get("window_days", 14))).isoformat()
     out.append(f"\n## 검색어별 건수 · 가장 오래된 게시일 (기간 시작 {since[5:]}보다 늦으면 페이지가 모자란 것)\n")
