@@ -17,6 +17,8 @@ Board settings (sources.yaml → boards[]):
     warmup: url                     open this page first (cookies) before the real request
     copy_hidden: [FIELD]            copy these hidden form values from the warmup page into data
     title_cell: n                   for clickable rows without links: which table cell (1-based) is the title
+    exclude: [word, ...]            drop a post when its title or row text contains any of these
+    require_any: [word, ...]        drop a post unless its title or row text contains at least one of these
     manual: "reason"                skip collecting; the editor checks this board by hand
 """
 import argparse
@@ -33,7 +35,7 @@ from lf.common import UA, customer_dir, issue_dir, load_yaml
 
 DATE = re.compile(r"(20\d{2})\s?[.\-/년]\s?(\d{1,2})\s?[.\-/월]\s?(\d{1,2})")
 ROW_TAGS = {"tr", "li", "article", "dl"}
-NOT_TITLE = re.compile(r"^(D\s*-\s*\d+|상세보기|더보기|새글|NEW|첨부파일.*)$", re.I)
+NOT_TITLE = re.compile(r"^\s*(D\s*-\s*\d+|상세보기|더보기|새글|NEW|첨부파일.*|사이트 가기|바로가기|사이트 이동|홈페이지 가기)\s*$", re.I)
 TITLE_PREFIX = re.compile(r"^(?:D\s*-\s*\d+|새글|NEW)\s+", re.I)  # labels glued in front of titles
 
 
@@ -151,6 +153,8 @@ def extract(page, base, keywords, detail_url=None, id_pattern=None, title_cell=N
                 title = max(titles, key=len) if titles else ""
             if title:
                 links = [{"text": title, "href": "", "onclick": row_onclick}]
+        # One row may link the same post several times (an icon "사이트 가기" plus the title): keep the longest title per URL.
+        candidates = {}
         for link in links:
             title, href = TITLE_PREFIX.sub("", link["text"]), link["href"]
             if len(title) < 6 or NOT_TITLE.match(title):
@@ -161,6 +165,9 @@ def extract(page, base, keywords, detail_url=None, id_pattern=None, title_cell=N
             js_link = None if url else (link["onclick"] or (href if href.startswith("javascript") else "") or row_onclick)
             url = url or resolve_js(js_link, detail_url, id_pattern)
             key = url or (title, js_link)
+            if key not in candidates or len(title) > len(candidates[key][0]):
+                candidates[key] = (title, url, js_link)
+        for key, (title, url, js_link) in candidates.items():
             if key in seen or (title, dates[0]) in seen:
                 continue
             seen.update({key, (title, dates[0])})
@@ -175,6 +182,19 @@ def extract(page, base, keywords, detail_url=None, id_pattern=None, title_cell=N
                 }
             )
     return posts
+
+
+def filter_posts(posts, exclude=None, require_any=None):
+    """Board-level noise filter on title + row text. Returns (kept posts, number dropped)."""
+    kept = []
+    for post in posts:
+        blob = post["title"] + " " + (post.get("row_text") or "")
+        if any(w in blob for w in exclude or []):
+            continue
+        if require_any and not any(w in blob for w in require_any):
+            continue
+        kept.append(post)
+    return kept, len(posts) - len(kept)
 
 
 def extract_json(payload, fields, keywords, detail_url=None):
@@ -256,14 +276,18 @@ def main():
                     response.text, response.url, keywords,
                     board.get("detail_url"), board.get("detail_id_pattern"), board.get("title_cell"),
                 )
+            posts, entry["filtered_out"] = filter_posts(posts, board.get("exclude"), board.get("require_any"))
             for index, post in enumerate(posts, 1):
                 post["id"] = f"B{number}-{index}"
             entry["posts"] = posts
-            entry["status"] = "ok" if response.ok and posts else ("no_posts_found" if response.ok else "http_error")
+            # Filtered down to nothing is still a good answer, so "ok" + filtered_out, not no_posts_found.
+            found = posts or entry["filtered_out"]
+            entry["status"] = "ok" if response.ok and found else ("no_posts_found" if response.ok else "http_error")
         except (requests.RequestException, ValueError) as exc:
             entry.update(status="fetch_failed", error=str(exc), posts=[])
         results.append(entry)
-        print(f"  [{entry['status']}] {board['name']}: 게시글 {len(entry['posts'])}건")
+        dropped = f" (필터 제외 {entry['filtered_out']}건)" if entry.get("filtered_out") else ""
+        print(f"  [{entry['status']}] {board['name']}: 게시글 {len(entry['posts'])}건{dropped}")
 
     out = folder / "candidates_boards.json"
     out.write_text(
