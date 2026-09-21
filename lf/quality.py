@@ -5,13 +5,14 @@ relevance, and whether each link really lands where it says.
 
 Reads digest_raw.md (which news IDs made the digest) and candidates_boards.json (all
 board posts). Fetches every page once and writes:
-    quality.json        per-item verdicts
+    quality.json        per-item verdicts, display_title (the title as shown on the article page) + title_source
     quality.md          exclusion list + warnings for the editor
-    digest_checked.md   digest_raw.md with a verdict appended to each item line
+    digest_checked.md   digest_raw.md with news titles replaced by display_title and a verdict appended
 Rules live in sources.yaml → quality: (min_body_chars, sensitive_strong, sensitive_weak).
 """
 import argparse
 import datetime as dt
+import difflib
 import html
 import json
 import re
@@ -34,10 +35,109 @@ DEFAULT = {
 TOPIC = re.compile(r"도시재생|원도심|마을|협동조합|사회적경제|사회연대|농촌|농어촌|어촌|소멸|상권|골목|전통시장|로컬|노후|공동체|빈집|기본소득|중간지원")
 OFFPAGE = re.compile(r"login|signin|member|/main\.do|/index\.(do|jsp|html)$|error|notfound|404", re.I)
 ITEM = re.compile(r"^- (?:★ |대안 )?(N\d+|B\d+-\d+) \|.*?\]\((https?://[^)\s]+)\)")
+ITEM_LINK = re.compile(r"\) \[(.*)\]\((https?://[^)\s]+)\)")  # the "[title](url)" of a digest item line
+META = re.compile(r"<meta\s[^>]*>", re.I)
+META_ATTR = re.compile(r"""([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+HTML_TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.S | re.I)
+MEDIA_HEAD = re.compile(r"^[\[【≪《]([^\]】≫》]{1,25})[\]】≫》]\s*")
+TAIL_SEP = re.compile(r"\s+(?:-|–|—|\||::|<)\s+")
+MEDIA_WORD = re.compile(r"뉴스|일보|신문|방송|타임[즈스]|저널|투데이|데일리|미디어|닷컴|경제|TV|News|Times|Daily|Post|기사본문", re.I)
 
 
 def norm(text):
     return re.sub(r"[^\w가-힣]", "", text or "")
+
+
+def unescape(text):
+    """html.unescape, twice when the page double-escaped ("&amp;ldquo;" — seen on ddaily.co.kr)."""
+    text = html.unescape(text)
+    return html.unescape(text) if re.search(r"&#?\w+;", text) else text
+
+
+def meta_content(raw, name):
+    """content of <meta property=NAME> or <meta name=NAME>: any attribute order, either quote style."""
+    for tag in META.finditer(raw):
+        attrs = {k.lower(): dq or sq for k, dq, sq in META_ATTR.findall(tag.group(0))}
+        if (attrs.get("property") or attrs.get("name") or "").lower() == name and attrs.get("content", "").strip():
+            return unescape(attrs["content"]).strip()
+    return ""
+
+
+def page_title(raw):
+    """(title, source): og:title, then twitter:title, then <title>. source is og | twitter | title | ''."""
+    for name, source in (("og:title", "og"), ("twitter:title", "twitter")):
+        title = meta_content(raw, name)
+        if title:
+            return title, source
+    m = HTML_TITLE.search(raw)
+    title = unescape(re.sub(r"\s+", " ", m.group(1))).strip() if m else ""
+    return title, ("title" if title else "")
+
+
+def site_name_of(raw):
+    """og:site_name, else the outlet tail that og:title carries and <title> lacks (or the reverse)."""
+    site = meta_content(raw, "og:site_name")
+    if site:
+        return site
+    m = HTML_TITLE.search(raw)
+    titles = [meta_content(raw, "og:title"), unescape(re.sub(r"\s+", " ", m.group(1))).strip() if m else ""]
+    for longer, shorter in (titles, titles[::-1]):
+        extra = longer[len(shorter):] if shorter and longer.startswith(shorter) else ""
+        if TAIL_SEP.match(extra):
+            return TAIL_SEP.split(extra)[-1].strip()
+    return ""
+
+
+def is_media(text, site="", host=""):
+    """Does this short piece name the outlet? Matches og:site_name, the host's ASCII name, or an outlet word."""
+    text = text.strip()
+    if not text or len(text) > 25:
+        return False
+    if site and (norm(text) in norm(site) or norm(site) in norm(text)):
+        return True
+    ascii_part = re.sub(r"[^a-z0-9]", "", text.lower())
+    if len(ascii_part) >= 3 and ascii_part in host.lower():
+        return True
+    return bool(MEDIA_WORD.search(text))
+
+
+def strip_media(title, site="", host=""):
+    """Remove the outlet from a page title: '[매체] ' heads and ' - 매체' / ' < 섹션 < 기사본문 - 매체' tails.
+    Only a tail that names the outlet (or 기사본문) is cut, so a ' - ' inside the headline survives."""
+    title = title.strip()
+    m = MEDIA_HEAD.match(title)
+    if m and is_media(m.group(1), site, host):
+        title = title[m.end():]
+    while True:
+        seps = list(TAIL_SEP.finditer(title))
+        if not seps:
+            break
+        last = seps[-1]
+        tail = title[last.end():]
+        if tail.strip() != "기사본문" and not is_media(tail, site, host):
+            break
+        title = title[:last.start()]
+        if last.group(0).strip() == "<":  # '< 섹션 < 기사본문': the whole chain is navigation
+            title = TAIL_SEP.split(title)[0] if " < " in title else title
+    return title.strip()
+
+
+def choose_title(api_title, page, site="", host=""):
+    """The title the reader sees on the article page, or the API title when the page gives nothing usable.
+
+    page: (title, source) from page_title(). Returns (display_title, title_source, warnings)."""
+    api_clean = api_title[:-3].rstrip() if api_title.endswith("...") else api_title
+    raw_title, source = page
+    cleaned = strip_media(raw_title, site, host) if raw_title else ""
+    a, b = norm(cleaned), norm(api_clean)
+    usable = cleaned and not is_media(cleaned, site, host) and len(a) >= 0.6 * len(b)
+    if not usable:
+        warnings = ["원제목 확인 못 함 — 기사 페이지에서 제목 확인"] if api_title.endswith("...") else []
+        return api_title, "api", warnings
+    warnings = []
+    if not a.startswith(b) and difflib.SequenceMatcher(None, a, b).ratio() < 0.6:
+        warnings.append(f"페이지 제목이 다름 — 다른 기사로 연결됐을 수 있음: {cleaned[:40]}")
+    return cleaned, source, warnings
 
 
 BODY_BLOCKS = re.compile(
@@ -48,10 +148,9 @@ BODY_BLOCKS = re.compile(
 
 
 def page_text(raw):
-    """(og:title, body text, exact) — exact is False when no article block was found and
+    """(body text, exact) — exact is False when no article block was found and
     the whole page (menus included) had to be used, so a 'short' verdict is not reliable."""
     raw = re.sub(r"<(script|style|noscript|header|footer|nav)[^>]*>.*?</\1>", " ", raw, flags=re.S | re.I)
-    og = re.search(r'property=["\']og:title["\']\s+content=["\']([^"\']+)', raw) or re.search(r'content=["\']([^"\']+)["\']\s+property=["\']og:title', raw)
 
     def clean(chunk):
         return html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", chunk))).strip()
@@ -59,19 +158,21 @@ def page_text(raw):
     blocks = [clean(m.group(2) or m.group(4) or "") for m in BODY_BLOCKS.finditer(raw)]
     best = max(blocks, key=len) if blocks else ""
     if len(best) >= 300:
-        return (html.unescape(og.group(1)).strip() if og else ""), best, True
-    return (html.unescape(og.group(1)).strip() if og else ""), clean(raw), False
+        return best, True
+    return clean(raw), False
 
 
 def fetch(item):
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    out = {"id": item["id"], "url": item["url"], "kind": item["kind"], "final_url": item["url"], "status": None, "hops": 0, "body_chars": 0, "og_title": ""}
+    out = {"id": item["id"], "url": item["url"], "kind": item["kind"], "final_url": item["url"], "status": None, "hops": 0, "body_chars": 0,
+           "page_title": "", "page_title_source": "", "site_name": ""}
     try:
         r = requests.get(item["url"], headers=UA, timeout=20, allow_redirects=True, verify=False)
         out.update(final_url=r.url, status=r.status_code, hops=len(r.history))
         if r.status_code < 400:
             r.encoding = r.apparent_encoding if r.encoding in (None, "ISO-8859-1") else r.encoding
-            out["og_title"], text, out["exact"] = page_text(r.text)
+            (out["page_title"], out["page_title_source"]), out["site_name"] = page_title(r.text), site_name_of(r.text)
+            text, out["exact"] = page_text(r.text)
             out["body_chars"] = len(text)
             out["_text"] = text[:20000]
     except requests.RequestException as exc:
@@ -165,11 +266,18 @@ def main():
 
     results, counts = {}, {"ok": 0, "warn": 0, "exclude": 0}
     for it in items:
-        verdict, reasons = judge(it, pages[it["id"]], rules)
-        counts[verdict] += 1
         p = pages[it["id"]]
-        results[it["id"]] = {"verdict": verdict, "reasons": reasons, "title": it["title"], "url": it["url"], "final_url": p["final_url"],
-                             "status": p["status"], "body_chars": p["body_chars"], "og_title": p["og_title"], "kind": it["kind"]}
+        verdict, reasons = judge(it, p, rules)
+        display, source = it["title"], "board"
+        if it["kind"] == "news":
+            display, source, notes = choose_title(it["title"], (p["page_title"], p["page_title_source"]), p["site_name"], urlparse(p["final_url"]).netloc)
+            reasons += notes
+            if notes and verdict == "ok":
+                verdict = "warn"
+        counts[verdict] += 1
+        results[it["id"]] = {"verdict": verdict, "reasons": reasons, "title": it["title"], "display_title": display, "title_source": source,
+                             "url": it["url"], "final_url": p["final_url"], "status": p["status"], "body_chars": p["body_chars"],
+                             "page_title": p["page_title"], "kind": it["kind"]}
     (folder / "quality.json").write_text(json.dumps({"checked_at": dt.datetime.now().isoformat(timespec="seconds"), "rules": rules, "counts": counts, "items": results}, ensure_ascii=False, indent=2), encoding="utf-8")
 
     mark = {"ok": "✓", "warn": "⚠", "exclude": "✖"}
@@ -178,9 +286,9 @@ def main():
         m = ITEM.match(line)
         if m and m.group(1) in results:
             r = results[m.group(1)]
+            if r["kind"] == "news" and r["display_title"] != r["title"]:
+                line = ITEM_LINK.sub(lambda lm: f") [{r['display_title']}]({lm.group(2)})", line, count=1)
             line += f"  {mark[r['verdict']]}" + (" " + "; ".join(r["reasons"]) if r["reasons"] else "")
-            if r["og_title"] and m.group(1).startswith("N") and norm(r["og_title"])[:12] != norm(r["title"])[:12] and r["title"].endswith("..."):
-                line += f" · 원제목: {r['og_title'][:60]}"
         out.append(line)
     (folder / "digest_checked.md").write_text("\n".join(out), encoding="utf-8")
 
@@ -194,6 +302,10 @@ def main():
         ids = [p["id"] for p in b.get("posts", []) if p["id"] in results]
         bad = [i for i in ids if results[i]["verdict"] != "ok"]
         md.append(f"- {b['board']}: {len(ids)}건 열어 봄, 문제 {len(bad)}건" + (f" ({', '.join(bad[:6])})" if bad else ""))
+    from_page = sum(1 for r in results.values() if r["kind"] == "news" and r["title_source"] != "api")
+    from_api = [r for r in results.values() if r["kind"] == "news" and r["title_source"] == "api"]
+    unresolved = sum(1 for r in from_api if r["title"].endswith("..."))
+    md.append(f"\n제목 출처 — 페이지 {from_page} · API {len(from_api)} (그중 원제목 확인 못 함 {unresolved})")
     (folder / "quality.md").write_text("\n".join(md), encoding="utf-8")
     print(f"✓ {counts['ok']} · ⚠ {counts['warn']} · ✖ {counts['exclude']} -> {folder / 'quality.md'}, digest_checked.md")
 
