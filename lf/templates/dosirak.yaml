@@ -8,8 +8,9 @@ card_img_width: 282     # image inside a 294px column (6px each side)
 card_col_width: 294
 card_text_width: 294
 section: "padding:0 15px;font-family:{font};"
-h2: "margin:0 0 12px;font-family:{font};font-size:18px;font-weight:700;line-height:1.5;color:#000000;"
-h3: "margin:14px 0 8px;font-family:{font};font-size:18px;font-weight:400;line-height:1.5;color:#000000;"
+# Headings are emitted as <div>: Stibee's HTML block resets h2/h3 margin and padding to 0 (2026-09-21 mailing), so spacing is padding on the div.
+h2: "padding:0 0 12px;font-family:{font};font-size:18px;font-weight:700;line-height:1.5;color:#000000;"
+h3: "padding:14px 0 8px;font-family:{font};font-size:18px;font-weight:400;line-height:1.5;color:#000000;"
 p: "margin:0 0 14px;font-family:{font};font-size:14px;line-height:1.85;color:#000000;"
 ul: "margin:0 0 14px;padding-left:20px;"
 li: "margin:0 0 8px;font-family:{font};font-size:16px;line-height:1.7;color:#000000;"

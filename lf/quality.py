@@ -8,7 +8,8 @@ board posts). Fetches every page once and writes:
     quality.json        per-item verdicts, display_title (the title as shown on the article page) + title_source
     quality.md          exclusion list + warnings for the editor
     digest_checked.md   digest_raw.md with news titles replaced by display_title and a verdict appended
-Rules live in sources.yaml → quality: (min_body_chars, sensitive_strong, sensitive_weak).
+Rules live in sources.yaml → quality: (min_body_chars, sensitive_strong, sensitive_weak,
+sensitive_allow — phrases removed before counting, e.g. 대통령상 so 대통령 does not fire).
 """
 import argparse
 import datetime as dt
@@ -31,6 +32,8 @@ DEFAULT = {
                          "특검", "검찰", "수사", "구속", "기소", "압수수색", "비리", "횡령", "뇌물", "직권남용", "내란", "친일", "종북", "고발", "고소"],
     # In the title → warn (editor decides). Conflict framing.
     "sensitive_weak": ["갈등", "반발", "논란", "규탄", "시위", "집회", "파업", "의혹", "폭로", "질타", "지적", "촉구", "비판", "무산", "표류", "특혜"],
+    # Removed from title and body before the two lists above are counted: "대통령상", "대통령 표창" are awards, not politics.
+    "sensitive_allow": [],
 }
 TOPIC = re.compile(r"도시재생|원도심|마을|협동조합|사회적경제|사회연대|농촌|농어촌|어촌|소멸|상권|골목|전통시장|로컬|노후|공동체|빈집|기본소득|중간지원")
 OFFPAGE = re.compile(r"login|signin|member|/main\.do|/index\.(do|jsp|html)$|error|notfound|404", re.I)
@@ -208,6 +211,12 @@ def judge(item, page, rules):
         elif page["hops"] and dst.path.rstrip("/") in ("", "/") :
             bump("exclude", "첫 화면으로 리다이렉트")
     # 2. sensitive politics (title strong → exclude; title weak → warn; body many strong → warn)
+    def scrub(text):
+        for phrase in rules.get("sensitive_allow") or []:
+            text = text.replace(phrase, "")
+        return text
+
+    title = scrub(title)
     strong = [w for w in rules["sensitive_strong"] if w in title]
     weak = [w for w in rules["sensitive_weak"] if w in title]
     if strong:
@@ -216,7 +225,8 @@ def judge(item, page, rules):
         bump("warn", "갈등·비판 표현(제목): " + ", ".join(weak))
     text = page.get("_text", "")
     if text:
-        body_strong = {w for w in rules["sensitive_strong"] if text.count(w) >= 2}
+        scrubbed = scrub(text)
+        body_strong = {w for w in rules["sensitive_strong"] if scrubbed.count(w) >= 2}
         if len(body_strong) >= 2:
             bump("warn", "본문에 정치·수사 민감어: " + ", ".join(sorted(body_strong)))
     if item["kind"] == "news":

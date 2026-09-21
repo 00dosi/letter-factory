@@ -90,6 +90,23 @@ def test_stibee_merge_tags_are_fixed_in_the_template_and_kept_from_the_draft(let
     assert "$%name%$ " + ascii("님") + "," in html and "<title>" + ascii("도시락 레터") + " $%name%$</title>" in html
 
 
+def test_dosirak_headings_are_divs_with_padding(letter):
+    # Stibee zeroes h2/h3 margins, so section and axis titles are divs whose spacing is padding
+    assert "<h2" not in letter and "<h3" not in letter
+    assert letter.count('<div style="padding:14px 0 8px;') >= 4  # 첫 글 · 🏙️ · 🌿 · 채용 · 공모
+    assert ascii("🏙️ 도시재생") in letter and '<span style="display:inline-block;background:#f2f3f5;padding:2px 10px;font-weight:700' in letter
+    assert letter.count('<a href="$%permalink%$"') == 1 and letter.count('<a href="$%unsubscribe%$"') == 2
+
+
+def test_footer_is_centred_with_two_lines_per_org():
+    profile = {**PROFILE, "footer": {**PROFILE["footer"], "orgs": [{"name": "주식회사 공공도시", "address": "서울"}, {"name": "도시정책데이터연구소", "address": "인천"}]}}
+    html, _ = render_letter(profile, META, BODY, "dosirak", issue_no=21)
+    box = html.split("$%unsubscribe%$")[0].rsplit("<td style=", 1)[1]
+    assert box.startswith('"padding:18px 20px;') and "text-align:center;" in box.split(">")[0]
+    assert f'<div><strong style="color:#000000;">{ascii("주식회사 공공도시")}</strong></div><div>{ascii("서울")}</div>' in box
+    assert f'<div style="padding:8px 0 0;"><strong style="color:#000000;">{ascii("도시정책데이터연구소")}</strong></div><div>{ascii("인천")}</div>' in box
+
+
 def test_stibee_package_has_no_forbidden_tags(letter):
     packed, embedded, kept = embed_images(strip_document(letter), fetch=lambda url: (_ for _ in ()).throw(ConnectionError("offline")))
     assert forbidden(packed) == []
@@ -100,7 +117,7 @@ def test_stibee_package_has_no_forbidden_tags(letter):
 
 def test_unknown_section_falls_back_to_generic_block():
     html, _ = render_letter(PROFILE, META, "## 기타 코너\n\n문단.\n", "dosirak", issue_no=21)
-    assert "<h2 style=" in html and ascii("기타 코너") in html
+    assert "<h2" not in html and ascii("기타 코너") in html and f'<div style="padding:0 0 12px;' in html
 
 
 @pytest.mark.parametrize("name", ["warm", "modern", "public", "colorful"])

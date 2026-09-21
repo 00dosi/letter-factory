@@ -269,11 +269,16 @@ def emit_dosirak(sections, style, profile):
             inner += f'<div style="padding:10px 0 0;">{fixed_image(tagline_url, 412)}</div>'
         row(inner, "18px 15px")
 
+    # Headings go out as <div>: Stibee's HTML block zeroes h2/h3 margin and padding, so the spacing lives in the div's padding.
+    def h3(text, inner=None):
+        return f'<div style="{css["h3"]}">{inner or inline(text, css["link"])}</div>'
+
     def items_html(items, link_key="link"):
-        return "".join(item_html(k, p, css, img_width=img_w, text_width=text_w, link_key=link_key, img_col_width=col_w) for k, p in items)
+        return "".join(h3(p) if k == "h3" else item_html(k, p, css, img_width=img_w, text_width=text_w, link_key=link_key, img_col_width=col_w)
+                       for k, p in items)
 
     def h2(title, extra=""):
-        return f'<h2 style="{css["h2"]}{extra}">{inline(title, css["link"])}</h2>'
+        return f'<div style="{css["h2"]}{extra}">{inline(title, css["link"])}</div>'
 
     for index, (section, key) in enumerate(zip(sections, keys)):
         title, items = section["title"], section["items"]
@@ -326,7 +331,7 @@ def emit_dosirak(sections, style, profile):
         elif key == "notices":
             row(f'<div style="{css["band"]}">{inline(title, css["link"])}</div>', "0 15px 8px")
             inner = "".join(
-                f'<h3 style="{css["h3"]}"><span style="{css["highlight"]}">{inline(p, css["link"])}</span></h3>' if k == "h3" else items_html([(k, p)])
+                h3(p, f'<span style="{css["highlight"]}">{inline(p, css["link"])}</span>') if k == "h3" else items_html([(k, p)])
                 for k, p in items)
             row(area(inner, "box"))
         else:
