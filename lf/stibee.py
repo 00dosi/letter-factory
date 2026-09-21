@@ -27,11 +27,11 @@ import requests
 from PIL import Image
 
 from lf.checks import link_status
-from lf.common import ROOT, UA, dump_yaml, issue_dir, load_env, load_yaml
-from lf.render import CARD_IMG_WIDTH, LINK, split_front_matter
+from lf.common import ROOT, UA, customer_dir, dump_yaml, issue_dir, load_env, load_yaml
+from lf.render import CARD_IMG_WIDTH, LINK, NO_UNSUBSCRIBE, split_front_matter
 
 API = "https://api.stibee.com/v1"
-CARD_IMG = re.compile(r'<img src="([^"]+)"[^>]*data-lf="card"')
+CARD_IMG = re.compile(r'<img src="([^"]+)"[^>]*?width="(\d+)"[^>]*data-lf="card"')
 EMBED_WIDTH = CARD_IMG_WIDTH * 2  # retina: twice the displayed width
 NO_TITLE = "제목 없음 — draft.md 머리말 title 필요"
 
@@ -59,9 +59,9 @@ def to_jpeg_data_uri(raw, width=EMBED_WIDTH, quality=80):
 def embed_images(letter, fetch=download):
     """Replace each card image URL in letter.html with a base64 JPEG. Returns (html, embedded, kept)."""
     done, embedded, kept = {}, 0, 0
-    for url in dict.fromkeys(CARD_IMG.findall(letter)):
+    for url, width in dict.fromkeys(CARD_IMG.findall(letter)):
         try:
-            done[url] = to_jpeg_data_uri(fetch(html_unescape(url)))
+            done[url] = to_jpeg_data_uri(fetch(html_unescape(url)), width=int(width) * 2)  # retina: twice the displayed width
             embedded += 1
         except Exception as exc:  # noqa: BLE001 — a failed image keeps its URL; the paste still works
             print(f"  경고: 이미지 내장 실패, URL 유지 ({exc.__class__.__name__}: {str(exc)[:80]}) {url}")
@@ -84,6 +84,8 @@ def pack(args):
     warn = "" if subject else f"<!-- !!!!!!!!!! {NO_TITLE} !!!!!!!!!! -->\n"
     if not subject:
         print(f"!!! {NO_TITLE} !!!")
+    if not (load_yaml(customer_dir(args.customer) / "profile.yaml").get("unsubscribe_html") or "").strip():
+        print(NO_UNSUBSCRIBE)
 
     letter, embedded, kept = embed_images(letter)
     head = (f"<!-- 스티비 붙여넣기용 · {subject} · 발송일 {args.send_date} · 생성 {dt.datetime.now():%Y-%m-%d %H:%M}\n"

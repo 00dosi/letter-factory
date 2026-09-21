@@ -1,0 +1,29 @@
+# 도시락레터 전용 — Vol.20 발송본 실측(customers/dosirak/design_spec_vol20.md). 흰 바탕 630px, 회색 #f2f3f5, 테두리 #d6dbe4.
+label: 도시락레터 (Vol.20 발송본 기준)
+layout: dosirak
+accent: "#000000"
+font: "AppleSDGothic,'apple sd gothic neo','noto sans korean','noto sans cjk kr','nanum gothic','malgun gothic',dotum,arial,sans-serif"
+card_img_width: 300
+card_text_width: 280
+section: "padding:0 15px;font-family:{font};"
+h2: "margin:0 0 12px;font-family:{font};font-size:18px;font-weight:700;line-height:1.5;color:#000000;"
+h3: "margin:14px 0 8px;font-family:{font};font-size:18px;font-weight:400;line-height:1.5;color:#000000;"
+p: "margin:0 0 14px;font-family:{font};font-size:14px;line-height:1.85;color:#000000;"
+ul: "margin:0 0 14px;padding-left:20px;"
+li: "margin:0 0 8px;font-family:{font};font-size:16px;line-height:1.7;color:#000000;"
+link: "color:#000000;text-decoration:none;"
+blog_link: "color:#0000ff;font-weight:700;text-decoration:none;"
+callout: "margin:6px 0 14px;padding:12px 16px;background:#f2f3f5;font-family:{font};font-size:14px;line-height:1.8;color:#000000;"
+image: "display:block;width:100%;max-width:600px;height:auto;margin:4px 0 14px;border:0;"
+card: "background:#ffffff;border:3px solid #f2f3f5;padding:0;"
+card_img: ""
+card_text: "padding:12px 16px 0;"
+gray: "background:#f2f3f5;padding:18px 20px;font-family:{font};"
+band: "background:#f2f3f5;padding:10px 20px;font-family:{font};font-size:18px;font-weight:700;line-height:1.5;color:#000000;"
+box: "background:#ffffff;border:3px solid #d6dbe4;padding:16px 20px;font-family:{font};"
+rule: "border-top:3px solid #000000;height:0;font-size:0;line-height:0;"
+dotted: "border-top:1px dotted #747579;height:0;font-size:0;line-height:0;"
+double_dotted: "border-top:1px dotted #747579;border-bottom:1px dotted #747579;height:3px;font-size:0;line-height:0;"
+short_rule: "width:145px;margin:14px auto;border-top:1px solid #747579;height:0;font-size:0;line-height:0;"
+highlight: "display:inline-block;background:#f2f3f5;padding:2px 10px;font-weight:700;font-size:16px;"
+small: "font-family:{font};font-size:12px;line-height:1.8;color:#747579;"

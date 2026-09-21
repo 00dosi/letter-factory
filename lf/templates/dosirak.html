@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+@media (max-width:480px) {
+  .lf-col { display:block !important; width:100% !important; max-width:100% !important; }
+  .lf-col img { width:100% !important; max-width:100% !important; }
+}
+</style>
+</head>
+<body style="margin:0;padding:0;background:#ffffff;">
+<span style="display:none;max-height:0;overflow:hidden;opacity:0;">{{ preheader }}</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">
+  <tr>
+    <td align="center" style="padding:16px 8px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:630px;background:#ffffff;">
+        <tr>
+          <td style="padding:0 15px 6px;{{ style.css('small') }}">{% if web_view_url %}<a href="{{ web_view_url }}" style="color:#747579;text-decoration:underline;">이 메일이 잘 안보이시나요?</a>{% else %}이 메일이 잘 안보이시나요?{% endif %}</td>
+        </tr>
+        <tr><td style="padding:0 15px;"><div style="{{ style.css('rule') }}">&nbsp;</div></td></tr>
+        <tr>
+          <td align="center" style="padding:24px 15px 6px;">
+            {% if design.logo_url %}<img src="{{ design.logo_url }}" alt="{{ title }}" width="408" style="display:block;margin:0 auto;max-width:100%;height:auto;border:0;">{% endif %}
+            {% if design.slogan_url %}<img src="{{ design.slogan_url }}" alt="" width="360" style="display:block;margin:8px auto 0;max-width:100%;height:auto;border:0;">{% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:6px 15px 20px;font-family:{{ font }};font-size:18px;font-weight:700;font-style:italic;color:#000000;">Vol. {{ issue_no }}</td>
+        </tr>
+        {% for row in blocks %}{{ row }}
+        {% endfor %}
+        <tr><td style="padding:20px 15px 0;"><div style="{{ style.css('rule') }}">&nbsp;</div></td></tr>
+        <tr>
+          <td align="center" style="padding:24px 15px 18px;font-family:{{ font }};font-size:14px;line-height:1.8;color:#000000;">
+            {% if design.org_logo_url %}<img src="{{ design.org_logo_url }}" alt="{{ org_name }}" width="412" style="display:block;margin:0 auto 14px;max-width:100%;height:auto;border:0;">{% endif %}
+            {% for line in pfooter.get('cta_lines', []) %}<div>{{ line }}</div>{% endfor %}
+            {% if pfooter.cta %}<div style="padding:14px 0 0;"><a href="{{ pfooter.cta.url }}" style="display:inline-block;background:#d6dbe4;border-radius:22px;padding:10px 24px;font-family:{{ font }};font-size:14px;font-weight:700;color:#000000;text-decoration:none;">{{ pfooter.cta.text }}</a></div>{% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 15px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f2f3f5;">
+              <tr>
+                <td style="padding:18px 20px;font-family:{{ font }};font-size:12px;line-height:1.9;color:#747579;">
+                  {% for org in pfooter.get('orgs', []) %}<div><strong style="color:#000000;">{{ org.name }}</strong> {{ org.address }}</div>{% endfor %}
+                  {% if pfooter.contact %}<div style="padding:8px 0 0;">{% if pfooter.contact.h %}H: <a href="{{ pfooter.contact.h }}" style="color:#747579;text-decoration:none;">{{ pfooter.contact.h }}</a><br>{% endif %}{% if pfooter.contact.e %}E: <a href="mailto:{{ pfooter.contact.e }}" style="color:#747579;text-decoration:none;">{{ pfooter.contact.e }}</a><br>{% endif %}{% if pfooter.contact.p %}P: {{ pfooter.contact.p }}{% endif %}</div>{% endif %}
+                  <div style="padding:8px 0 0;">{{ unsubscribe_html }}</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        {% if pfooter.submit %}
+        <tr>
+          <td align="center" style="padding:22px 15px 10px;font-family:{{ font }};font-size:14px;line-height:1.8;color:#000000;">
+            <div>{{ pfooter.submit.text }}</div>
+            <div style="padding:12px 0 0;"><a href="{{ pfooter.submit.url }}" style="display:inline-block;background:#d6dbe4;border-radius:22px;padding:10px 24px;font-family:{{ font }};font-size:14px;font-weight:700;color:#000000;text-decoration:none;">{{ pfooter.submit.button }}</a></div>
+          </td>
+        </tr>
+        {% endif %}
+        {% if pfooter.sns %}
+        <tr>
+          <td align="center" style="padding:6px 15px 24px;">
+            {% for s in pfooter.sns %}<a href="{{ s.url }}" style="display:inline-block;margin:0 6px;"><img src="{{ s.icon }}" alt="" width="28" style="display:block;width:28px;height:auto;border:0;"></a>{% endfor %}
+          </td>
+        </tr>
+        {% endif %}
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

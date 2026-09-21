@@ -67,6 +67,38 @@
 카드는 `display:inline-block` 두 칸(이미지 240px · 글 276px)이라 좁은 화면에서 세로로 쌓이고, Outlook 용 조건부 표가 같이 들어간다.
 `lf.stibee pack`은 카드 이미지를 480px JPEG(품질 80) base64 로 `stibee.html`에 내장한다. 내려받기에 실패한 이미지는 URL 을 유지하고 경고한다.
 
+## 도시락레터 템플릿 (`template: dosirak`)
+
+Vol.20 발송본 실측(`customers/dosirak/design_spec_vol20.md`) 기준. `## 코너 제목`을 profile.yaml `sections[].title`과 맞춰
+key(greeting · own_news · news · opinion · notices)별로 다른 모양을 그린다. 고정 이미지·버튼·푸터는 profile.yaml에서 읽는다:
+
+```yaml
+template: dosirak
+web_view_url: ""                      # 비우면 "이 메일이 잘 안보이시나요?" 글자만
+unsubscribe_html: '<a href="$%unsubscribe%$">수신거부 Unsubscribe</a>'   # 비우면 render·stibee pack 이 경고
+design:
+  logo_url: https://img2.stibee.com/...      # 도시락 아이콘 + Dosirak Letter (폭 408)
+  slogan_url: https://img2.stibee.com/...    # 손글씨 슬로건 (폭 360)
+  skyline_url: https://img2.stibee.com/...   # 인사말 박스 도시 실루엣 (폭 570)
+  leaf_url: https://img2.stibee.com/...      # 인사말 뒤 잎 아이콘 (폭 40)
+  dove_url: https://img2.stibee.com/...      # 공공도시 소식 뒤 비둘기 (폭 42)
+  tagline_url: https://img2.stibee.com/...   # "바쁜 일상 속에서도…" 글자 이미지 (폭 412)
+  org_logo_url: https://img2.stibee.com/...  # 꼬리 공공도시 로고 (폭 412)
+footer:
+  cta_lines: [부담스러운 정책 변화, 막막한 실무, 공공도시가 최고의 길을 함께 고민하겠습니다.]
+  cta: {text: 👉 막막한 실무 고민, 프로젝트 문의하기, url: https://00dosi.co.kr}
+  orgs:
+    - {name: 주식회사 공공도시, address: 서울특별시 동대문구 서울시립대로 117, 206호}
+    - {name: 도시정책데이터연구소, address: 인천광역시 서구 원당대로 1035, 306호}
+  contact: {h: https://00dosi.co.kr, e: contact@00dosi.co.kr, p: (02)-6925-5251}
+  submit: {text: 🙋도시락레터에 전하고 싶은 소식이 있으신가요?🙋, button: 👉 내 소식 도시락에 담기, url: https://...}
+  sns:
+    - {icon: https://img2.stibee.com/....png, url: https://00dosi.co.kr}
+    - {icon: https://img2.stibee.com/....png, url: https://www.facebook.com/...}
+```
+
+카드는 왼쪽 이미지 300px · 오른쪽 글. `<style>` 의 `@media (max-width:480px)` 로 두 칸이 폭 100%가 되고, 미디어쿼리를 무시하는 곳에서도 inline-block 이라 좁은 화면에서 줄바꿈된다.
+
 ## 개발
 
 ```
