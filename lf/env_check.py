@@ -12,7 +12,7 @@ import json
 import re
 import sys
 
-from lf.common import ROOT, UA, customer_dir, load_yaml, resolve_issue_dir
+from lf.common import ROOT, UA, customer_dir, issue_dir_template, load_yaml
 
 BOARDS = [
     ("NABIS 채용공고", "https://www.nabis.go.kr/businessJobList.do?menucd=204&menuFlag=Y"),
@@ -20,13 +20,28 @@ BOARDS = [
 ]
 
 
-def main():
-    slug = sys.argv[1] if len(sys.argv) > 1 else "dosirak"
+def issues_parent(slug):
+    """The folder that holds the issue folders: the issue_dir rule up to its first placeholder other than {slug}.
+    02_drafts/Vol{vol}_{mmdd} → 02_drafts; the default → customers/<slug>/issues. No issue number is computed."""
+    head = issue_dir_template().replace("{slug}", slug).split("{")[0]
+    return ROOT / head.rsplit("/", 1)[0] if "/" in head else ROOT
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    slug = argv[0] if argv else "dosirak"
     rows = []
 
     def add(name, ok, detail):
         rows.append({"check": name, "ok": ok, "detail": detail})
         print(f"  {'✓' if ok else '✗'} {name}: {detail}")
+
+    def run(name, check):
+        """One check must not stop the others: a crash becomes a ✗ row and the next check runs."""
+        try:
+            check()
+        except (Exception, SystemExit) as exc:  # noqa: BLE001
+            add(name, False, f"{exc.__class__.__name__}: {exc}")
 
     v = sys.version_info
     add("Python", v >= (3, 9), f"{v.major}.{v.minor}.{v.micro}")
@@ -48,18 +63,20 @@ def main():
     add(".env 네이버 키", bool(env.get("NAVER_CLIENT_ID") and env.get("NAVER_CLIENT_SECRET")), "있음" if env.get("NAVER_CLIENT_ID") else f"없음 ({env_file})")
     add(".env 스티비 키 (선택)", bool(env.get("STIBEE_API_KEY") and env.get("STIBEE_LIST_ID")), "있음" if env.get("STIBEE_API_KEY") else "없음 — 주소록 동기화는 수동")
 
-    probe = resolve_issue_dir(slug, "_probe").parent / ".write_test"
-    try:
+    def write_probe():
+        # Write into the folder that holds the issue folders, not into a fake issue (which would need an issue number).
+        parent = issues_parent(slug)
+        parent.mkdir(parents=True, exist_ok=True)
+        probe = parent / ".write_test"
         probe.write_text(dt.datetime.now().isoformat(), encoding="utf-8")
-    except Exception as exc:  # noqa: BLE001
-        add("폴더 쓰기", False, f"{exc.__class__.__name__}: {exc}")
-    else:
         try:
             probe.unlink()
-            add("폴더 쓰기", True, str(probe.parent))
+            add("폴더 쓰기", True, str(parent))
         except Exception:  # noqa: BLE001
             # Cowork mounts allow writing but not deleting (2026-09-17). Writing is what the pipeline needs.
-            add("폴더 쓰기", True, f"{probe.parent} (삭제는 막힘 — 정상. 남은 .write_test 는 무시)")
+            add("폴더 쓰기", True, f"{parent} (삭제는 막힘 — 정상. 남은 .write_test 는 무시)")
+
+    run("폴더 쓰기", write_probe)
 
     if missing:
         verdict(rows)
@@ -69,44 +86,42 @@ def main():
 
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-    country = "?"
-    try:
+    def ip_country():
         info = requests.get("https://ipinfo.io/json", headers=UA, timeout=8).json()
         country = info.get("country", "?")
         add("나가는 IP 국가", country == "KR", f"{country} {info.get('ip', '')} — " + ("한국 게시판 접속 가능" if country == "KR" else "해외 IP: 한국 공공 게시판이 막힐 수 있음"))
-    except Exception as exc:  # noqa: BLE001
-        add("나가는 IP 국가", False, f"확인 실패 ({exc.__class__.__name__})")
+
+    run("나가는 IP 국가", ip_country)
+
+    def naver_api():
+        r = requests.get("https://openapi.naver.com/v1/search/news.json", params={"query": "도시재생", "display": 1},
+                         headers={"X-Naver-Client-Id": env["NAVER_CLIENT_ID"], "X-Naver-Client-Secret": env["NAVER_CLIENT_SECRET"]}, timeout=10)
+        add("네이버 뉴스 API", r.status_code == 200, f"HTTP {r.status_code}" + ("" if r.status_code == 200 else f" {r.text[:80]}"))
 
     if env.get("NAVER_CLIENT_ID"):
-        try:
-            r = requests.get("https://openapi.naver.com/v1/search/news.json", params={"query": "도시재생", "display": 1},
-                             headers={"X-Naver-Client-Id": env["NAVER_CLIENT_ID"], "X-Naver-Client-Secret": env["NAVER_CLIENT_SECRET"]}, timeout=10)
-            add("네이버 뉴스 API", r.status_code == 200, f"HTTP {r.status_code}" + ("" if r.status_code == 200 else f" {r.text[:80]}"))
-        except Exception as exc:  # noqa: BLE001
-            add("네이버 뉴스 API", False, f"연결 실패 ({exc.__class__.__name__})")
+        run("네이버 뉴스 API", naver_api)
+
+    def board(name, url):
+        r = requests.get(url, headers=UA, timeout=15, verify=False)
+        add(f"게시판 {name}", r.status_code == 200 and len(r.text) > 2000, f"HTTP {r.status_code}, {len(r.text)}자")
 
     for name, url in BOARDS:
-        try:
-            r = requests.get(url, headers=UA, timeout=15, verify=False)
-            ok = r.status_code == 200 and len(r.text) > 2000
-            add(f"게시판 {name}", ok, f"HTTP {r.status_code}, {len(r.text)}자")
-        except Exception as exc:  # noqa: BLE001
-            add(f"게시판 {name}", False, f"연결 실패 ({exc.__class__.__name__})")
+        run(f"게시판 {name}", lambda name=name, url=url: board(name, url))
 
-    rss = (load_yaml(customer_dir(slug) / "profile.yaml").get("blog") or {}).get("rss")
-    if rss:
-        try:
-            xml = requests.get(rss, headers=UA, timeout=20).text
-            blog_id = re.search(r"rss\.blog\.naver\.com/([^.]+)\.xml", rss).group(1)
-            post = re.search(r"<link>(?:\s*<!\[CDATA\[)?[^<]*?(\d{10,})", xml)
-            add("블로그 RSS", bool(post), f"항목 {xml.count('<item>')}개")
-            if post:
-                r = requests.get(f"https://m.blog.naver.com/{blog_id}/{post.group(1)}", headers=UA, timeout=20)
-                body = re.sub(r"<[^>]+>", "", r.text)
-                add("블로그 본문 (m.blog)", r.status_code == 200 and "se-main-container" in r.text, f"HTTP {r.status_code}, 본문 컨테이너 {'있음' if 'se-main-container' in r.text else '없음'}, {len(body)}자")
-        except Exception as exc:  # noqa: BLE001
-            add("블로그 RSS", False, f"실패 ({exc.__class__.__name__})")
+    def blog():
+        rss = (load_yaml(customer_dir(slug) / "profile.yaml").get("blog") or {}).get("rss")
+        if not rss:
+            return
+        xml = requests.get(rss, headers=UA, timeout=20).text
+        blog_id = re.search(r"rss\.blog\.naver\.com/([^.]+)\.xml", rss).group(1)
+        post = re.search(r"<link>(?:\s*<!\[CDATA\[)?[^<]*?(\d{10,})", xml)
+        add("블로그 RSS", bool(post), f"항목 {xml.count('<item>')}개")
+        if post:
+            r = requests.get(f"https://m.blog.naver.com/{blog_id}/{post.group(1)}", headers=UA, timeout=20)
+            body = re.sub(r"<[^>]+>", "", r.text)
+            add("블로그 본문 (m.blog)", r.status_code == 200 and "se-main-container" in r.text, f"HTTP {r.status_code}, 본문 컨테이너 {'있음' if 'se-main-container' in r.text else '없음'}, {len(body)}자")
 
+    run("블로그 RSS", blog)
     verdict(rows)
 
 

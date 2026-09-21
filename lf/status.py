@@ -41,6 +41,16 @@ def stage_of(folder):
     return stage, nxt, meta
 
 
+def env_line(today=None):
+    """The 환경 line from env_check.json; a check older than today is marked stale."""
+    env = ROOT / "env_check.json"
+    if not env.exists():
+        return "환경: 미점검 → python3 -m lf.env_check 먼저"
+    e = json.loads(env.read_text(encoding="utf-8"))
+    stale = e["checked_at"][:10] != (today or dt.date.today()).isoformat()
+    return f"환경: {e['mode']} (점검 {e['checked_at'][:16]})" + (" (오래됨 — 오늘 다시 점검 권장)" if stale else "")
+
+
 def main():
     slug = sys.argv[1] if len(sys.argv) > 1 else "dosirak"
     cdir = customer_dir(slug)
@@ -55,12 +65,7 @@ def main():
         send = str(upcoming[0])
     folder = resolve_issue_dir(slug, send)
 
-    env = ROOT / "env_check.json"
-    if env.exists():
-        e = json.loads(env.read_text(encoding="utf-8"))
-        print(f"환경: {e['mode']} (점검 {e['checked_at'][:16]})")
-    else:
-        print("환경: 미점검 → python3 -m lf.env_check 먼저")
+    print(env_line())
 
     print(f"호: 발송일 {send} · 폴더 {folder.relative_to(ROOT)}")
     if not folder.exists():
