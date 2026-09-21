@@ -1,4 +1,4 @@
-"""Check a draft before delivery: links, deadlines, duplicates, banned phrases.
+"""Check a draft before delivery: links, deadlines, duplicates, banned phrases, leftover placeholders.
 
     python3 -m lf.checks <customer> <send_date>
 
@@ -21,6 +21,26 @@ from lf.render import IMAGE, LINK, split_front_matter
 
 DEADLINE = re.compile(r"~\s?(?:(20\d{2})[.\-/])?(\d{1,2})[./\-](\d{1,2})")
 BANNED = ["Claude", "클로드", "AI가", "AI 분석", "인공지능이 작성", "!!"]
+BRACKET = re.compile(r"\[([^\[\]]*)\]")
+PLACEHOLDER_WORDS = ("확인", "미정", "추후", "채울", "입력", "TODO", "TBD", "FIXME", "XXX", "??")
+
+
+def check_placeholders(body):
+    """Brackets left outside links. '[마감 확인]'-style placeholders must be fixed; other brackets need a look.
+
+    Links are removed first (LINK keeps one level of nested brackets, so '[[기고]제목](url)' goes whole),
+    and image lines are skipped. Returns (problems, manual)."""
+    problems, manual = [], []
+    for number, line in enumerate(body.splitlines(), 1):
+        if IMAGE.match(line.strip()):
+            continue
+        for match in BRACKET.finditer(LINK.sub("", line)):
+            mark, inner = match.group(0), match.group(1).strip().upper()
+            if not inner or any(word in inner for word in PLACEHOLDER_WORDS):
+                problems.append(f"{number}행: 미완성 표시 '{mark}' — 채우거나 지워야 함")
+            else:
+                manual.append(f"{number}행: 링크가 아닌 대괄호 '{mark}' — 의도한 것인지 확인")
+    return problems, manual
 
 
 def link_status(url):
@@ -89,6 +109,10 @@ def main():
         for phrase in BANNED:
             if phrase in line:
                 problems.append(f"{number}행: 금지 표현 '{phrase}'")
+
+    placeholder_problems, placeholder_manual = check_placeholders(body)
+    problems += placeholder_problems
+    manual += placeholder_manual
 
     # The same post may appear once as news and once as a notice; only a repeat inside one section is a mistake.
     duplicates = sorted({u for s, u in placed if placed.count((s, u)) > 1})
