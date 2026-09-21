@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from lf.render import render_letter, split_front_matter
+from lf.stibee import embed_images, forbidden, strip_document
 
 FIXTURES = Path(__file__).parent / "fixtures"
 META, BODY = split_front_matter((FIXTURES / "regression_draft.md").read_text(encoding="utf-8"))
@@ -11,8 +12,6 @@ PROFILE = {
     "org_name": "(주)공공도시", "brand": {"color": "#C8512B", "logo_url": ""},
     "sections": [{"key": "greeting", "title": "인사말"}, {"key": "own_news", "title": "📰 공공도시 소식"}, {"key": "news", "title": "📊 업계 동향"},
                  {"key": "opinion", "title": "💭 오늘의 생각 한 술"}, {"key": "notices", "title": "📢 정책·공모 알림"}],
-    "web_view_url": "https://00dosi.stibee.com/p/21",
-    "unsubscribe_html": '<a href="$%unsubscribe%$">수신거부 Unsubscribe</a>',
     "design": {"logo_url": "https://i.kr/logo.png", "slogan_url": "https://i.kr/slogan.png", "skyline_url": "https://i.kr/sky.png",
                "leaf_url": "https://i.kr/leaf.png", "dove_url": "https://i.kr/dove.png", "tagline_url": "https://i.kr/tag.png", "org_logo_url": "https://i.kr/org.png"},
     "footer": {"cta_lines": ["부담스러운 정책 변화, 막막한 실무", "공공도시가 최고의 길을 함께 고민하겠습니다."],
@@ -62,7 +61,9 @@ def test_sections_and_separators_come_in_vol20_order(letter):
 def test_own_news_has_two_groups_and_cards_use_300px_image(letter):
     assert letter.count("text-align:center;text-decoration:underline;") == 2
     assert letter.count('data-lf="card"') == 2
-    assert 'width="300" data-lf="card"' in letter and 'class="lf-col"' in letter and "@media (max-width:480px)" in letter
+    assert 'width="300" data-lf="card"' in letter and "max-width:300px" in letter
+    assert "@media" not in letter and "<style" not in letter and "class=" not in letter  # no media query: Stibee strips <style>
+    assert "border:3px solid #f2f3f5;padding:0;text-align:center;" in letter and "padding:12px 16px 0;text-align:left;" in letter
     assert letter.count("border-top:1px dotted #747579;border-bottom:1px dotted #747579") == 1
 
 
@@ -73,10 +74,20 @@ def test_list_items_carry_font_and_article_links_are_black_without_underline(let
     assert '<a href="https://blog.naver.com/00dosi/1" style="color:#0000ff;font-weight:700;text-decoration:none;">' in letter
 
 
-def test_missing_unsubscribe_html_warns():
-    profile = {**PROFILE, "unsubscribe_html": ""}
-    _, warnings = render_letter(profile, META, BODY, "dosirak", issue_no=21)
-    assert warnings == ["경고: 수신거부 링크 없음 — 스티비 치환 태그 확인 (profile.yaml unsubscribe_html)"]
+def test_stibee_merge_tags_are_fixed_in_the_template_and_kept_from_the_draft(letter):
+    assert '<a href="$%permalink%$"' in letter
+    assert letter.count('<a href="$%unsubscribe%$"') == 2 and ascii("수신거부") in letter and "Unsubscribe" in letter
+    body = BODY.replace("담당자 님, 안녕하세요.", "안녕하세요 $%name%$ 님,")
+    html, _ = render_letter({**PROFILE}, {**META, "title": "도시락 레터 $%name%$"}, body, "dosirak", issue_no=21)
+    assert "$%name%$ " + ascii("님") + "," in html and "<title>" + ascii("도시락 레터") + " $%name%$</title>" in html
+
+
+def test_stibee_package_has_no_forbidden_tags(letter):
+    packed, embedded, kept = embed_images(strip_document(letter), fetch=lambda url: (_ for _ in ()).throw(ConnectionError("offline")))
+    assert forbidden(packed) == []
+    assert packed.startswith("<span") and packed.endswith("</table>")
+    assert "$%permalink%$" in packed and "$%unsubscribe%$" in packed and 'data-lf="card"' in packed
+    assert forbidden('<table><tr><td onclick="x()"><style>a{}</style><form></form></td></tr></table>') == ["스티비 금지 태그 <form> 1개", "스티비 금지 태그 <style> 1개", "이벤트 속성(onclick 등) 1개"]
 
 
 def test_unknown_section_falls_back_to_generic_block():

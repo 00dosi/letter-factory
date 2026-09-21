@@ -22,6 +22,7 @@ from lf.render import IMAGE, LINK, split_front_matter
 DEADLINE = re.compile(r"~\s?(?:(20\d{2})[.\-/])?(\d{1,2})[./\-](\d{1,2})")
 BANNED = ["Claude", "클로드", "AI가", "AI 분석", "인공지능이 작성", "!!"]
 BRACKET = re.compile(r"\[([^\[\]]*)\]")
+MERGE_LINK = re.compile(r"\[((?:[^\[\]]|\[[^\[\]]*\])+)\]\(\$%[^)\s]+%\$\)")  # [수신거부]($%unsubscribe%$): Stibee fills the href
 PLACEHOLDER_WORDS = ("확인", "미정", "추후", "채울", "입력", "TODO", "TBD", "FIXME", "XXX", "??")
 
 
@@ -41,7 +42,7 @@ def check_placeholders(body):
     for number, line in enumerate(body.splitlines(), 1):
         if IMAGE.match(line.strip()):
             continue
-        for match in BRACKET.finditer(LINK.sub("", line)):
+        for match in BRACKET.finditer(MERGE_LINK.sub("", LINK.sub("", line))):
             mark, inner = match.group(0), match.group(1).strip().upper()
             if not inner or any(word in inner for word in PLACEHOLDER_WORDS):
                 problems.append(f"{number}행: 미완성 표시 '{mark}' — 채우거나 지워야 함")

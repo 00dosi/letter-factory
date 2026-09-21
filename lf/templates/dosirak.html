@@ -4,12 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }}</title>
-<style>
-@media (max-width:480px) {
-  .lf-col { display:block !important; width:100% !important; max-width:100% !important; }
-  .lf-col img { width:100% !important; max-width:100% !important; }
-}
-</style>
 </head>
 <body style="margin:0;padding:0;background:#ffffff;">
 <span style="display:none;max-height:0;overflow:hidden;opacity:0;">{{ preheader }}</span>
@@ -18,7 +12,7 @@
     <td align="center" style="padding:16px 8px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:630px;background:#ffffff;">
         <tr>
-          <td style="padding:0 15px 6px;{{ style.css('small') }}">{% if web_view_url %}<a href="{{ web_view_url }}" style="color:#747579;text-decoration:underline;">이 메일이 잘 안보이시나요?</a>{% else %}이 메일이 잘 안보이시나요?{% endif %}</td>
+          <td style="padding:0 15px 6px;{{ style.css('small') }}"><a href="$%permalink%$" style="color:#747579;text-decoration:underline;">이 메일이 잘 안보이시나요?</a></td>
         </tr>
         <tr><td style="padding:0 15px;"><div style="{{ style.css('rule') }}">&nbsp;</div></td></tr>
         <tr>
@@ -47,7 +41,7 @@
                 <td style="padding:18px 20px;font-family:{{ font }};font-size:12px;line-height:1.9;color:#747579;">
                   {% for org in pfooter.get('orgs', []) %}<div><strong style="color:#000000;">{{ org.name }}</strong> {{ org.address }}</div>{% endfor %}
                   {% if pfooter.contact %}<div style="padding:8px 0 0;">{% if pfooter.contact.h %}H: <a href="{{ pfooter.contact.h }}" style="color:#747579;text-decoration:none;">{{ pfooter.contact.h }}</a><br>{% endif %}{% if pfooter.contact.e %}E: <a href="mailto:{{ pfooter.contact.e }}" style="color:#747579;text-decoration:none;">{{ pfooter.contact.e }}</a><br>{% endif %}{% if pfooter.contact.p %}P: {{ pfooter.contact.p }}{% endif %}</div>{% endif %}
-                  <div style="padding:8px 0 0;">{{ unsubscribe_html }}</div>
+                  <div style="padding:8px 0 0;"><a href="$%unsubscribe%$" style="color:#747579;text-decoration:underline;">수신거부</a> <a href="$%unsubscribe%$" style="color:#747579;text-decoration:underline;">Unsubscribe</a></div>
                 </td>
               </tr>
             </table>

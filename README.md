@@ -74,8 +74,6 @@ key(greeting · own_news · news · opinion · notices)별로 다른 모양을 �
 
 ```yaml
 template: dosirak
-web_view_url: ""                      # 비우면 "이 메일이 잘 안보이시나요?" 글자만
-unsubscribe_html: '<a href="$%unsubscribe%$">수신거부 Unsubscribe</a>'   # 비우면 render·stibee pack 이 경고
 design:
   logo_url: https://img2.stibee.com/...      # 도시락 아이콘 + Dosirak Letter (폭 408)
   slogan_url: https://img2.stibee.com/...    # 손글씨 슬로건 (폭 360)
@@ -97,7 +95,12 @@ footer:
     - {icon: https://img2.stibee.com/....png, url: https://www.facebook.com/...}
 ```
 
-카드는 왼쪽 이미지 300px · 오른쪽 글. `<style>` 의 `@media (max-width:480px)` 로 두 칸이 폭 100%가 되고, 미디어쿼리를 무시하는 곳에서도 inline-block 이라 좁은 화면에서 줄바꿈된다.
+카드는 왼쪽 이미지 300px · 오른쪽 글. 두 칸은 inline-block 이라 좁은 화면에서 줄바꿈되고, 줄바꿈된 칸은 가운데 정렬된다(미디어쿼리 없음).
+
+스티비 규칙(help.stibee.com/email/edit/html): HTML 편집기는 `<script> <head> <body> <html> <style> <form> <input> <button> <noscript> <meta> <iframe>` 와 `onclick` 같은 이벤트 속성을 받지 않는다.
+`lf.stibee pack`은 letter.html 에서 본문 표만 남긴 `stibee.html`을 만들고, 금지 태그가 남으면 "고칠 것"으로 보고하며 exit 1.
+템플릿에는 스티비 치환자가 고정으로 들어간다: 머리 안내 `$%permalink%$`, 푸터 `$%unsubscribe%$`(일반 URL 을 넣으면 수신거부가 작동하지 않는다).
+원고에도 `$%name%$` 같은 치환자를 쓸 수 있고, render·checks 는 이를 그대로 둔다.
 
 ## 개발
 

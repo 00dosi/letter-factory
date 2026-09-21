@@ -38,7 +38,6 @@ BLOCK_KEYS = ("section", "h2", "h3", "p", "ul", "li", "link", "callout", "image"
 CARD_IMG_WIDTH, CARD_TEXT_WIDTH = 240, 276  # 516 + 2px card border fits modern (520)
 # a line that is only an image, optionally wrapped in a link: ![alt](img) / [![alt](img)](url)
 IMAGE = re.compile(r"^(?:\[)?!\[([^\]]*)\]\((https?://\S+?)\)(?:\]\((https?://\S+?)\))?$")
-NO_UNSUBSCRIBE = "경고: 수신거부 링크 없음 — 스티비 치환 태그 확인 (profile.yaml unsubscribe_html)"
 
 
 def split_front_matter(text):
@@ -82,22 +81,21 @@ def inline(text, link_css):
     return LINK.sub(lambda m: f'<a href="{m.group(2)}" style="{link_css}">{m.group(1)}</a>', text)
 
 
-def card_html(image, paragraphs, css, img_width=CARD_IMG_WIDTH, text_width=CARD_TEXT_WIDTH, col_class=None, link_key="link"):
-    """Two fluid columns: inline-block divs that sit side by side at full width and stack on narrow screens,
-    plus a conditional two-cell table for Outlook, which ignores max-width on divs."""
-    cls = f' class="{col_class}"' if col_class else ""
+def card_html(image, paragraphs, css, img_width=CARD_IMG_WIDTH, text_width=CARD_TEXT_WIDTH, link_key="link"):
+    """Two fluid columns: inline-block divs that sit side by side at full width and stack on narrow screens
+    (no media query — Stibee strips <style>), plus a conditional two-cell table for Outlook."""
     columns = ""
     if image:
         alt, src, href = image
         img = (f'<img src="{html.escape(src)}" alt="{html.escape(alt)}" width="{img_width}" data-lf="card" '
                f'style="display:block;width:100%;max-width:{img_width}px;height:auto;border:0;{css["card_img"]}">')
         columns += (f'<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="{img_width}" valign="top"><![endif]-->'
-                    f'<div{cls} style="display:inline-block;width:100%;max-width:{img_width}px;vertical-align:top;">'
+                    f'<div style="display:inline-block;width:100%;max-width:{img_width}px;vertical-align:top;">'
                     + (f'<a href="{html.escape(href)}">{img}</a>' if href else img) + '</div>'
                     f'<!--[if mso]></td><td width="{text_width}" valign="top"><![endif]-->')
     text = "".join(f'<p style="{css["p"]}">{"<br>".join(inline(l, css[link_key]) for l in lines)}</p>' for lines in paragraphs)
     # Padding goes on an inner div: on the column itself it would add to the width and wrap the columns.
-    columns += (f'<div{cls} style="display:inline-block;width:100%;max-width:{text_width}px;vertical-align:top;">'
+    columns += (f'<div style="display:inline-block;width:100%;max-width:{text_width}px;vertical-align:top;">'
                 f'<div style="{css["card_text"]}">{text}</div></div>')
     if image:
         columns += '<!--[if mso]></td></tr></table><![endif]-->'
@@ -267,7 +265,7 @@ def emit_dosirak(sections, style, profile):
         row(inner, "18px 15px")
 
     def items_html(items, link_key="link"):
-        return "".join(item_html(k, p, css, img_width=img_w, text_width=text_w, col_class="lf-col", link_key=link_key) for k, p in items)
+        return "".join(item_html(k, p, css, img_width=img_w, text_width=text_w, link_key=link_key) for k, p in items)
 
     def h2(title, extra=""):
         return f'<h2 style="{css["h2"]}{extra}">{inline(title, css["link"])}</h2>'
@@ -343,15 +341,14 @@ def issue_number(meta, folder=None):
 
 
 def render_letter(profile, meta, body, name, send_date=None, issue_no=""):
-    """(letter html, warnings). The dosirak layout also needs profile design/footer/web_view_url/unsubscribe_html."""
+    """(letter html, warnings). The dosirak layout also needs profile design/footer.
+    Stibee merge tags ($%name%$, $%permalink%$, $%unsubscribe%$) pass through untouched."""
     style = Style(name, profile.get("brand") or {})
     send = dt.date.fromisoformat(str(meta.get("send_date", send_date)))
     dosirak = style.raw.get("layout") == "dosirak"
     sections = parse(body)
     rows = emit_dosirak(sections, style, profile) if dosirak else emit_generic(sections, style)
     warnings = []
-    if dosirak and not (profile.get("unsubscribe_html") or "").strip():
-        warnings.append(NO_UNSUBSCRIBE)
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(PKG / "templates"), autoescape=True)
     letter = env.get_template(f"{name}.html").render(
         title=meta.get("title") or profile["org_name"],
@@ -365,8 +362,6 @@ def render_letter(profile, meta, body, name, send_date=None, issue_no=""):
         footer=meta.get("footer") or profile["org_name"],
         design=profile.get("design") or {},
         pfooter=profile.get("footer") if isinstance(profile.get("footer"), dict) else {},
-        web_view_url=profile.get("web_view_url") or "",
-        unsubscribe_html=jinja2.utils.markupsafe.Markup(profile.get("unsubscribe_html") or ""),
         style=style,
         **style.tokens,
     )

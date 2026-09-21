@@ -27,13 +27,33 @@ import requests
 from PIL import Image
 
 from lf.checks import link_status
-from lf.common import ROOT, UA, customer_dir, dump_yaml, issue_dir, load_env, load_yaml
-from lf.render import CARD_IMG_WIDTH, LINK, NO_UNSUBSCRIBE, split_front_matter
+from lf.common import ROOT, UA, dump_yaml, issue_dir, load_env, load_yaml
+from lf.render import CARD_IMG_WIDTH, LINK, split_front_matter
 
 API = "https://api.stibee.com/v1"
 CARD_IMG = re.compile(r'<img src="([^"]+)"[^>]*?width="(\d+)"[^>]*data-lf="card"')
 EMBED_WIDTH = CARD_IMG_WIDTH * 2  # retina: twice the displayed width
 NO_TITLE = "제목 없음 — draft.md 머리말 title 필요"
+# Stibee's HTML editor rejects these (help.stibee.com/email/edit/html); design_spec_vol20.md §7.
+FORBIDDEN_TAG = re.compile(r"<(script|head|body|html|style|form|input|button|noscript|meta|iframe)\b", re.I)
+EVENT_ATTR = re.compile(r"\son[a-z]+\s*=", re.I)
+
+
+def strip_document(letter):
+    """letter.html (a full document) → the body's tables only, <style> blocks removed, for pasting into Stibee."""
+    body = re.search(r"<body[^>]*>(.*)</body>", letter, re.S | re.I)
+    inner = body.group(1) if body else letter
+    return re.sub(r"<style\b[^>]*>.*?</style>", "", inner, flags=re.S | re.I).strip()
+
+
+def forbidden(html):
+    """Problems Stibee would reject: forbidden tags and on* event attributes, as '고칠 것' lines."""
+    tags = sorted({m.group(1).lower() for m in FORBIDDEN_TAG.finditer(html)})
+    problems = [f"스티비 금지 태그 <{t}> {len(re.findall(rf'<{t}\b', html, re.I))}개" for t in tags]
+    events = EVENT_ATTR.findall(html)
+    if events:
+        problems.append(f"이벤트 속성(onclick 등) {len(events)}개")
+    return problems
 
 
 def download(url):
@@ -84,15 +104,16 @@ def pack(args):
     warn = "" if subject else f"<!-- !!!!!!!!!! {NO_TITLE} !!!!!!!!!! -->\n"
     if not subject:
         print(f"!!! {NO_TITLE} !!!")
-    if not (load_yaml(customer_dir(args.customer) / "profile.yaml").get("unsubscribe_html") or "").strip():
-        print(NO_UNSUBSCRIBE)
 
-    letter, embedded, kept = embed_images(letter)
+    letter, embedded, kept = embed_images(strip_document(letter))
     head = (f"<!-- 스티비 붙여넣기용 · {subject} · 발송일 {args.send_date} · 생성 {dt.datetime.now():%Y-%m-%d %H:%M}\n"
             f"     제목: {subject}\n     미리보기 문구: {preheader}\n"
             "     사용법: 스티비 이메일 만들기 → 콘텐츠 → 'HTML 직접 입력'(코드 편집) → 이 파일 내용 전체 붙여넣기 -->\n")
     (folder / "stibee.html").write_text(warn + head + letter, encoding="utf-8")
     print(f"이미지 {embedded}장 내장, {kept}장 URL 유지")
+    problems = forbidden(letter)
+    for line in problems:
+        print(f"  고칠 것: {line}")
 
     blocks = [f"# 스티비 블록 편집기용 — {subject}", f"- 제목: {subject}", f"- 미리보기 문구: {preheader}", f"- 발송: {args.send_date}(월) 07:30 예약", ""]
     images = []
@@ -113,6 +134,8 @@ def pack(args):
     links = len(set(u for _, u in LINK.findall(body)))
     print(f"stibee.html (HTML 편집기용) · stibee_blocks.md (블록 {n}개, 이미지 {len(images)}장, 링크 {links}개) -> {folder}")
     print(f"제목: {subject}\n미리보기: {preheader}")
+    if problems:
+        sys.exit(f"고칠 것 {len(problems)}건 — 스티비 HTML 편집기가 거부하는 태그가 남아 있습니다")
 
 
 def read_csv(path):
@@ -187,7 +210,7 @@ def testmail(args):
             found.append(decode(token))
         except Exception:  # noqa: BLE001
             pass
-    found = list(dict.fromkeys(found))
+    found = [u for u in dict.fromkeys(found) if "$%" not in u]  # merge tags ($%unsubscribe%$) are Stibee's, not ours to open
     _, body = split_front_matter((folder / "draft.md").read_text(encoding="utf-8"))
     expected = list(dict.fromkeys(u for _, u in LINK.findall(body)))
     missing = [u for u in expected if u not in found]

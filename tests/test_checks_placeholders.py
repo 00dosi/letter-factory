@@ -41,3 +41,10 @@ def test_line_numbers_follow_body_lines():
     body = "## 코너\n\n(지역) [제목](https://a.kr) ~[마감 확인]\n[TODO]"
     problems, _ = check_placeholders(body)
     assert [p.split("행")[0] for p in problems] == ["3", "4"]
+
+
+def test_merge_tag_links_and_title_are_not_flagged():
+    from lf.checks import check_front_matter
+
+    assert check_placeholders("[수신거부]($%unsubscribe%$) · 안녕하세요 $%name%$ 님") == ([], [])
+    assert check_front_matter({"title": "도시락 레터 $%name%$"}) == []
