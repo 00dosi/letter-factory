@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "레터팩토리 뉴스레터 제작 엔진 — 네이버 뉴스·게시판 수집, 품질 검사, 원고 검사, 이메일 HTML 렌더, MCP 서버"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["requests", "PyYAML", "Jinja2"]
+dependencies = ["requests", "PyYAML", "Jinja2", "Pillow"]
 
 [project.scripts]
 letter-factory-mcp = "lf.mcp_server:main"

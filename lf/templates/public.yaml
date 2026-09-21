@@ -11,3 +11,6 @@ li: "margin:0;padding:9px 0;border-bottom:1px dashed #d6dce4;font-size:15px;line
 link: "color:{deep};text-decoration:underline;font-weight:600;"
 callout: "margin:8px 0 16px;padding:13px 16px;background:#f4f6f9;border:1px solid #d6dce4;font-size:14px;line-height:1.7;color:#333333;"
 image: "display:block;width:100%;max-width:600px;height:auto;margin:6px 0 16px;border:1px solid #d6dce4;"
+card: "background:#ffffff;border:1px solid #d6dce4;padding:0;"
+card_img: "border:0;"
+card_text: "padding:12px 16px 0;"

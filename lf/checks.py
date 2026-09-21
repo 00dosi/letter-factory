@@ -25,6 +25,13 @@ BRACKET = re.compile(r"\[([^\[\]]*)\]")
 PLACEHOLDER_WORDS = ("확인", "미정", "추후", "채울", "입력", "TODO", "TBD", "FIXME", "XXX", "??")
 
 
+def check_front_matter(meta):
+    """The subject line comes from the front matter; an empty title would go out as an empty subject."""
+    if not str(meta.get("title") or "").strip():
+        return ["머리말 title 없음 — draft.md 머리말 title 필요 (제목 문구를 지어 넣지 않는다)"]
+    return []
+
+
 def check_placeholders(body):
     """Brackets left outside links. '[마감 확인]'-style placeholders must be fixed; other brackets need a look.
 
@@ -84,7 +91,7 @@ def main():
     send = dt.date.fromisoformat(str(meta.get("send_date", args.send_date)))
     cutoff = send + dt.timedelta(days=1)
 
-    problems, manual = [], []
+    problems, manual = check_front_matter(meta), []
     urls, placed, section = [], [], ""
     for number, line in enumerate(body.splitlines(), 1):
         if line.startswith("## "):

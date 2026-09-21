@@ -13,6 +13,9 @@ draft.md format:
     - [제목](url) — 매체       list item (consecutive lines form one list)
     > 강조 문단                 callout
     일반 문단                   paragraph (separate with a blank line)
+    :::card … :::             card: image on the left, text on the right (blog posts, banners)
+        first line  [![alt](image)](link) or ![alt](image) — optional; without it the card is text only
+        then paragraphs (blank line between), one <br> per line inside a paragraph
 Inline: [text](url), **bold**.
 """
 import argparse
@@ -27,7 +30,9 @@ from lf.common import PKG, customer_dir, issue_dir, load_yaml
 
 # [text](url) where text may itself contain [brackets], e.g. [[기획] 제목](url)
 LINK = re.compile(r"\[((?:[^\[\]]|\[[^\[\]]*\])+)\]\((https?://[^)\s]+)\)")
-BLOCK_KEYS = ("section", "h2", "h3", "p", "ul", "li", "link", "callout", "image")
+BLOCK_KEYS = ("section", "h2", "h3", "p", "ul", "li", "link", "callout", "image", "card", "card_img", "card_text")
+# Card columns: image + text must fit the narrowest template body (600 minus section padding = 520).
+CARD_IMG_WIDTH, CARD_TEXT_WIDTH = 240, 276  # 516 + 2px card border fits modern (520)
 # a line that is only an image, optionally wrapped in a link: ![alt](img) / [![alt](img)](url)
 IMAGE = re.compile(r"^(?:\[)?!\[([^\]]*)\]\((https?://\S+?)\)(?:\]\((https?://\S+?)\))?$")
 
@@ -73,6 +78,47 @@ def inline(text, link_css):
     return LINK.sub(lambda m: f'<a href="{m.group(2)}" style="{link_css}">{m.group(1)}</a>', text)
 
 
+def card_html(image, paragraphs, css):
+    """Two fluid columns: inline-block divs that sit side by side at 600px and stack on narrow screens,
+    plus a conditional two-cell table for Outlook, which ignores max-width on divs."""
+    columns = ""
+    if image:
+        alt, src, href = image
+        img = (f'<img src="{html.escape(src)}" alt="{html.escape(alt)}" width="{CARD_IMG_WIDTH}" data-lf="card" '
+               f'style="display:block;width:100%;max-width:{CARD_IMG_WIDTH}px;height:auto;border:0;{css["card_img"]}">')
+        columns += (f'<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="{CARD_IMG_WIDTH}" valign="top"><![endif]-->'
+                    f'<div style="display:inline-block;width:100%;max-width:{CARD_IMG_WIDTH}px;vertical-align:top;">'
+                    + (f'<a href="{html.escape(href)}">{img}</a>' if href else img) + '</div>'
+                    f'<!--[if mso]></td><td width="{CARD_TEXT_WIDTH}" valign="top"><![endif]-->')
+    text = "".join(f'<p style="{css["p"]}">{"<br>".join(inline(l, css["link"]) for l in lines)}</p>' for lines in paragraphs)
+    # Padding goes on an inner div: on the column itself it would add to the 280px and wrap the columns.
+    columns += (f'<div style="display:inline-block;width:100%;max-width:{CARD_TEXT_WIDTH}px;vertical-align:top;">'
+                f'<div style="{css["card_text"]}">{text}</div></div>')
+    if image:
+        columns += '<!--[if mso]></td></tr></table><![endif]-->'
+    return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;margin:0 0 10px;">'
+            f'<tr><td style="{css["card"]}">{columns}</td></tr></table>')
+
+
+def parse_card(lines):
+    """(image or None, paragraphs) from the lines between :::card and :::. Each paragraph is a list of lines."""
+    image, paragraphs, current = None, [], []
+    for index, raw in enumerate(lines):
+        line = raw.strip()
+        if index == 0 and IMAGE.match(line):
+            image = IMAGE.match(line).groups()
+            continue
+        if not line:
+            if current:
+                paragraphs.append(current)
+                current = []
+            continue
+        current.append(line[2:] if line.startswith("- ") else line)
+    if current:
+        paragraphs.append(current)
+    return image, paragraphs
+
+
 def blocks(body, style):
     sections, current = [], None
     paragraph, items = [], []
@@ -96,8 +142,23 @@ def blocks(body, style):
             current["html"].append(f'<ul style="{css["ul"]}">{lis}</ul>')
             items.clear()
 
+    card = None  # lines collected between :::card and :::
     for raw in body.splitlines():
         line = raw.strip()
+        if card is not None:
+            if line == ":::":
+                flush()
+                current["html"].append(card_html(*parse_card(card), current["css"]))
+                card = None
+            else:
+                card.append(raw)
+            continue
+        if line == ":::card":
+            flush()
+            if current is None:
+                current = new_section(None)
+            card = []
+            continue
         if line.startswith("## "):
             flush()
             current = new_section(line[3:])
@@ -127,6 +188,8 @@ def blocks(body, style):
                 flush()
             paragraph.append(line)
     flush()
+    if card is not None:  # unterminated :::card — render what we have rather than drop it
+        current["html"].append(card_html(*parse_card(card), current["css"]))
 
     rows = []
     for section in sections:
