@@ -1,4 +1,5 @@
 """dosirak layout: section-specific wrappers in Vol.20 order; other templates stay byte-identical. No network."""
+import re
 from pathlib import Path
 
 import pytest
@@ -62,8 +63,14 @@ def test_own_news_has_two_groups_and_cards_use_300px_image(letter):
     assert letter.count("text-align:center;text-decoration:underline;") == 2
     assert letter.count('data-lf="card"') == 2
     assert 'width="300" data-lf="card"' in letter and "max-width:300px" in letter
+    # Vol.20 geometry: card row has no side padding, two 312px columns (mso table too), no whitespace between them
+    assert letter.count('<tr><td style="padding:0;"><table role="presentation" width="100%"') == 2
+    assert letter.count('display:inline-block;width:100%;max-width:312px;vertical-align:top;') == 4
+    assert '<td width="312" valign="top">' in letter and letter.count('<td width="312"') == 4
+    assert re.search(r'</div>\s+<div style="display:inline-block', letter) is None
+    assert 'style="display:block;width:100%;max-width:300px;height:auto;border:0;margin:6px auto;"' in letter
     assert "@media" not in letter and "<style" not in letter and "class=" not in letter  # no media query: Stibee strips <style>
-    assert "border:3px solid #f2f3f5;padding:0;text-align:center;" in letter and "padding:12px 16px 0;text-align:left;" in letter
+    assert "border:3px solid #f2f3f5;padding:0;text-align:center;" in letter and "padding:10px 16px 0;text-align:left;" in letter
     assert letter.count("border-top:1px dotted #747579;border-bottom:1px dotted #747579") == 1
 
 

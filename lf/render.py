@@ -81,16 +81,19 @@ def inline(text, link_css):
     return LINK.sub(lambda m: f'<a href="{m.group(2)}" style="{link_css}">{m.group(1)}</a>', text)
 
 
-def card_html(image, paragraphs, css, img_width=CARD_IMG_WIDTH, text_width=CARD_TEXT_WIDTH, link_key="link"):
+def card_html(image, paragraphs, css, img_width=CARD_IMG_WIDTH, text_width=CARD_TEXT_WIDTH, link_key="link", img_col_width=None):
     """Two fluid columns: inline-block divs that sit side by side at full width and stack on narrow screens
-    (no media query — Stibee strips <style>), plus a conditional two-cell table for Outlook."""
+    (no media query — Stibee strips <style>), plus a conditional two-cell table for Outlook.
+    img_col_width lets the image column be wider than the image (dosirak: 312px column, 300px image centred).
+    The two divs touch with no whitespace between them, so no text node can push the second column down."""
+    img_col = img_col_width or img_width
     columns = ""
     if image:
         alt, src, href = image
         img = (f'<img src="{html.escape(src)}" alt="{html.escape(alt)}" width="{img_width}" data-lf="card" '
                f'style="display:block;width:100%;max-width:{img_width}px;height:auto;border:0;{css["card_img"]}">')
-        columns += (f'<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="{img_width}" valign="top"><![endif]-->'
-                    f'<div style="display:inline-block;width:100%;max-width:{img_width}px;vertical-align:top;">'
+        columns += (f'<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="{img_col}" valign="top"><![endif]-->'
+                    f'<div style="display:inline-block;width:100%;max-width:{img_col}px;vertical-align:top;">'
                     + (f'<a href="{html.escape(href)}">{img}</a>' if href else img) + '</div>'
                     f'<!--[if mso]></td><td width="{text_width}" valign="top"><![endif]-->')
     text = "".join(f'<p style="{css["p"]}">{"<br>".join(inline(l, css[link_key]) for l in lines)}</p>' for lines in paragraphs)
@@ -243,7 +246,9 @@ def section_keys(sections, profile_sections):
 def emit_dosirak(sections, style, profile):
     design = profile.get("design") or {}
     css = {key: style.css(key) for key in DOSIRAK_KEYS}
-    img_w, text_w = int(style.raw.get("card_img_width", 300)), int(style.raw.get("card_text_width", 280))
+    # Vol.20: the card spans the full 630px body; inside the 3px border two 312px columns hold a 300px image and the text.
+    img_w, text_w = int(style.raw.get("card_img_width", 300)), int(style.raw.get("card_text_width", 312))
+    col_w = int(style.raw.get("card_col_width", text_w))
     keys = section_keys(sections, profile.get("sections"))
     rows = []
 
@@ -265,7 +270,7 @@ def emit_dosirak(sections, style, profile):
         row(inner, "18px 15px")
 
     def items_html(items, link_key="link"):
-        return "".join(item_html(k, p, css, img_width=img_w, text_width=text_w, link_key=link_key) for k, p in items)
+        return "".join(item_html(k, p, css, img_width=img_w, text_width=text_w, link_key=link_key, img_col_width=col_w) for k, p in items)
 
     def h2(title, extra=""):
         return f'<h2 style="{css["h2"]}{extra}">{inline(title, css["link"])}</h2>'
@@ -292,7 +297,7 @@ def emit_dosirak(sections, style, profile):
             for kind, payload in items:
                 if kind == "card":
                     flush_gray()
-                    row(items_html([(kind, payload)], "blog_link"))
+                    row(items_html([(kind, payload)], "blog_link"), "0")  # no side padding: the card uses the whole 630px
                 else:
                     buffer.append((kind, payload))
             flush_gray()
