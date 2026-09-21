@@ -15,6 +15,7 @@ Board settings (sources.yaml → boards[]):
     detail_url: ...{id}...          build post links from a JS call or a JSON id
     detail_id_pattern: regex        which number in the JS call is the post id (group 1); a group 2 fills {id2}
     warmup: url                     open this page first (cookies) before the real request
+    legacy_tls: true                site only speaks old cipher suites (SSLV3_ALERT_HANDSHAKE_FAILURE): lower the TLS security level
     copy_hidden: [FIELD]            copy these hidden form values from the warmup page into data
     title_cell: n                   for clickable rows without links: which table cell (1-based) is the title
     exclude: [word, ...]            drop a post when its title or row text contains any of these
@@ -25,18 +26,39 @@ import argparse
 import datetime as dt
 import json
 import re
+import ssl
 from html.parser import HTMLParser
 from urllib.parse import urljoin
 
 import requests
 import urllib3
+from requests.adapters import HTTPAdapter
 
 from lf.common import UA, customer_dir, issue_dir, load_yaml
 
 DATE = re.compile(r"(20\d{2})\s?[.\-/년]\s?(\d{1,2})\s?[.\-/월]\s?(\d{1,2})")
 ROW_TAGS = {"tr", "li", "article", "dl"}
-NOT_TITLE = re.compile(r"^\s*(D\s*-\s*\d+|상세보기|더보기|새글|NEW|첨부파일.*|사이트 가기|바로가기|사이트 이동|홈페이지 가기)\s*$", re.I)
-TITLE_PREFIX = re.compile(r"^(?:D\s*-\s*\d+|새글|NEW)\s+", re.I)  # labels glued in front of titles
+NOT_TITLE = re.compile(r"^\s*(D\s*-\s*\d+|상세보기|더보기|새글|NEW|신청마감|접수마감|접수중|첨부파일.*|사이트 가기|바로가기|사이트 이동|홈페이지 가기)\s*$", re.I)
+TITLE_PREFIX = re.compile(r"^(?:D\s*-\s*\d+|새글|NEW|신청마감|접수마감|접수중)\s+", re.I)  # labels glued in front of titles
+LEGACY_HINT = "— sources.yaml 에 legacy_tls: true 를 넣어 보세요"
+
+
+class LegacyTLSAdapter(HTTPAdapter):
+    """For sites that only accept old cipher suites: OpenSSL security level 1 and legacy renegotiation."""
+
+    def init_poolmanager(self, *args, **kwargs):
+        context = ssl.create_default_context()
+        context.set_ciphers("DEFAULT:@SECLEVEL=1")
+        context.options |= getattr(ssl, "OP_LEGACY_SERVER_CONNECT", 0)
+        kwargs["ssl_context"] = context
+        return super().init_poolmanager(*args, **kwargs)
+
+
+def make_session(board):
+    session = requests.Session()
+    if board.get("legacy_tls"):
+        session.mount("https://", LegacyTLSAdapter())
+    return session
 
 
 class RowParser(HTMLParser):
@@ -255,7 +277,7 @@ def main():
             print(f"  [manual] {board['name']}: {board['manual']}")
             continue
         try:
-            session, referer = requests.Session(), None
+            session, referer = make_session(board), None
             if board.get("warmup"):
                 # Some boards only answer a POST after their search page has set a cookie and a hidden token.
                 referer = fill(board["warmup"])
@@ -284,7 +306,10 @@ def main():
             found = posts or entry["filtered_out"]
             entry["status"] = "ok" if response.ok and found else ("no_posts_found" if response.ok else "http_error")
         except (requests.RequestException, ValueError) as exc:
-            entry.update(status="fetch_failed", error=str(exc), posts=[])
+            error = str(exc)
+            if "HANDSHAKE_FAILURE" in error and not board.get("legacy_tls"):
+                error += " " + LEGACY_HINT
+            entry.update(status="fetch_failed", error=error, posts=[])
         results.append(entry)
         dropped = f" (필터 제외 {entry['filtered_out']}건)" if entry.get("filtered_out") else ""
         print(f"  [{entry['status']}] {board['name']}: 게시글 {len(entry['posts'])}건{dropped}")
