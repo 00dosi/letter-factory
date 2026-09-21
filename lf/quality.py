@@ -39,6 +39,7 @@ ITEM_LINK = re.compile(r"\) \[(.*)\]\((https?://[^)\s]+)\)")  # the "[title](url
 META = re.compile(r"<meta\s[^>]*>", re.I)
 META_ATTR = re.compile(r"""([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
 HTML_TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.S | re.I)
+H1 = re.compile(r"<h1[^>]*>(.*?)</h1>", re.S | re.I)
 MEDIA_HEAD = re.compile(r"^[\[【≪《]([^\]】≫》]{1,25})[\]】≫》]\s*")
 TAIL_SEP = re.compile(r"\s+(?:-|–|—|\||::|<)\s+")
 MEDIA_WORD = re.compile(r"뉴스|일보|신문|방송|타임[즈스]|저널|투데이|데일리|미디어|닷컴|경제|TV|News|Times|Daily|Post|기사본문", re.I)
@@ -64,14 +65,16 @@ def meta_content(raw, name):
 
 
 def page_title(raw):
-    """(title, source): og:title, then twitter:title, then <title>. source is og | twitter | title | ''."""
-    for name, source in (("og:title", "og"), ("twitter:title", "twitter")):
-        title = meta_content(raw, name)
+    """(title, source): og:title, then <title>, then the first <h1>. source is og | title | h1 | ''."""
+    title = meta_content(raw, "og:title")
+    if title:
+        return title, "og"
+    for pattern, source in ((HTML_TITLE, "title"), (H1, "h1")):
+        m = pattern.search(raw)
+        title = unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", m.group(1)))).strip() if m else ""
         if title:
             return title, source
-    m = HTML_TITLE.search(raw)
-    title = unescape(re.sub(r"\s+", " ", m.group(1))).strip() if m else ""
-    return title, ("title" if title else "")
+    return "", ""
 
 
 def site_name_of(raw):

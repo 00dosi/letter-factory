@@ -15,10 +15,19 @@ def test_og_title_single_quoted_content_before_property():
     assert page_title(raw) == ('괴산군 "농어촌기본소득" 유치 총력', "og")
 
 
-def test_fallback_twitter_then_html_title():
-    assert page_title('<meta name="twitter:title" content="트위터 제목">') == ("트위터 제목", "twitter")
+def test_fallback_html_title_then_h1():
+    assert page_title('<meta name="twitter:title" content="트위터 제목"><title>문서 제목</title>') == ("문서 제목", "title")
     assert page_title("<title>\n  문서 제목 &amp; 부제  </title>") == ("문서 제목 & 부제", "title")
     assert page_title("<p>no title</p>") == ("", "")
+
+
+def test_h1_used_when_og_title_and_title_are_missing():
+    raw = '<html><body><header><h1 class="tit">[충북일보] 괴산군 <em>\'농어촌기본소득\'</em> 유치 총력</h1></header><p>본문</p></body></html>'
+    title, source = page_title(raw)
+    assert (title, source) == ("[충북일보] 괴산군 \'농어촌기본소득\' 유치 총력", "h1")
+    assert strip_media(title) == "괴산군 \'농어촌기본소득\' 유치 총력"
+    display, title_source, warnings = choose_title("괴산군 '농어촌기본소득' 유치 총력", (title, source))
+    assert (display, title_source, warnings) == ("괴산군 \'농어촌기본소득\' 유치 총력", "h1", [])
 
 
 def test_double_escaped_entities_are_decoded():
