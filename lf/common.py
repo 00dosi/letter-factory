@@ -88,7 +88,7 @@ def load_yaml(path):
 
 def dump_yaml(data, path):
     with open(path, "w", encoding="utf-8") as f:
-        yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
+        yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False, width=4096)  # never fold issue.yaml log lines
 
 
 def strip_tags(text):

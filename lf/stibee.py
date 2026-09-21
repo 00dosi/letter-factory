@@ -224,16 +224,29 @@ def decode(token):
     return base64.urlsafe_b64decode(token).decode("utf-8", "replace")
 
 
-def testmail(args):
-    folder = issue_dir(args.customer, args.send_date)
-    text = Path(args.pasted_file).read_text(encoding="utf-8")
+BARE_URL = re.compile(r"""https?://[^\s"'<>]+""")
+
+
+def mail_links(text):
+    """Every destination URL in a pasted Stibee mail: decoded click-tracking links (real sends) plus plain
+    http(s) URLs in href="…" or bare text (test sends carry the original addresses, 2026-09-21 Vol21).
+    Merge tags ($%…%$), Stibee's own preview/error pages and the tracking links themselves are left out."""
     found = []
     for token in re.findall(r"event\.stibee\.com/v2/click/[^/\s)]+/([A-Za-z0-9_\-]+)", text):
         try:
             found.append(decode(token))
         except Exception:  # noqa: BLE001
             pass
-    found = [u for u in dict.fromkeys(found) if "$%" not in u]  # merge tags ($%unsubscribe%$) are Stibee's, not ours to open
+    for url in BARE_URL.findall(text):
+        url = url.replace("&amp;", "&").rstrip(".,;)")
+        if "event.stibee.com/" not in url:
+            found.append(url)
+    return [u for u in dict.fromkeys(found) if "$%" not in u and "stibee.com/error/preview" not in u]
+
+
+def testmail(args):
+    folder = issue_dir(args.customer, args.send_date)
+    found = mail_links(Path(args.pasted_file).read_text(encoding="utf-8"))
     _, body = split_front_matter((folder / "draft.md").read_text(encoding="utf-8"))
     expected = list(dict.fromkeys(u for _, u in LINK.findall(body)))
     missing = [u for u in expected if u not in found]
