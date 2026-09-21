@@ -56,11 +56,16 @@ def forbidden(html):
     return problems
 
 
-def download(url):
-    """Bytes of an image the way an email client would fetch it (no Referer). Naver needs ?type=w773."""
+def naver_thumb(url):
+    """Naver blog thumbnails answer only with ?type=w773 (and then without a Referer, which is what mail clients send)."""
     if "pstatic.net" in url and "type=" not in url:
         url += ("&" if "?" in url else "?") + "type=w773"
-    r = requests.get(url, headers={"User-Agent": UA["User-Agent"]}, timeout=30)
+    return url
+
+
+def download(url):
+    """Bytes of an image the way an email client would fetch it (no Referer)."""
+    r = requests.get(naver_thumb(url), headers={"User-Agent": UA["User-Agent"]}, timeout=30)
     r.raise_for_status()
     return r.content
 
@@ -76,8 +81,19 @@ def to_jpeg_data_uri(raw, width=EMBED_WIDTH, quality=80):
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
 
 
+def external_images(letter):
+    """Default: card images stay external URLs (Gmail drops data: images, 2026-09-21), Naver ones with ?type=w773.
+    Returns (html, number of card images)."""
+    urls = [url for url, _ in dict.fromkeys(CARD_IMG.findall(letter))]
+    for url in urls:
+        fixed = naver_thumb(html_unescape(url)).replace("&", "&amp;")
+        if fixed != url:
+            letter = letter.replace(f'<img src="{url}"', f'<img src="{fixed}"')
+    return letter, len(urls)
+
+
 def embed_images(letter, fetch=download):
-    """Replace each card image URL in letter.html with a base64 JPEG. Returns (html, embedded, kept)."""
+    """--embed-images: replace each card image URL with a base64 JPEG. Gmail does not show these. Returns (html, embedded, kept)."""
     done, embedded, kept = {}, 0, 0
     for url, width in dict.fromkeys(CARD_IMG.findall(letter)):
         try:
@@ -105,12 +121,19 @@ def pack(args):
     if not subject:
         print(f"!!! {NO_TITLE} !!!")
 
-    letter, embedded, kept = embed_images(strip_document(letter))
+    letter = strip_document(letter)
+    if args.embed_images:
+        print("경고: Gmail 은 base64 이미지를 표시하지 않는다 (2026-09-21 테스트 발송 확인) — 외부 URL 이 기본이다")
+        letter, embedded, kept = embed_images(letter)
+        image_line = f"이미지 {embedded}장 내장, {kept}장 URL 유지"
+    else:
+        letter, count = external_images(letter)
+        image_line = f"이미지 {count}장 URL 사용(외부 호스팅)"
     head = (f"<!-- 스티비 붙여넣기용 · {subject} · 발송일 {args.send_date} · 생성 {dt.datetime.now():%Y-%m-%d %H:%M}\n"
             f"     제목: {subject}\n     미리보기 문구: {preheader}\n"
             "     사용법: 스티비 이메일 만들기 → 콘텐츠 → 'HTML 직접 입력'(코드 편집) → 이 파일 내용 전체 붙여넣기 -->\n")
     (folder / "stibee.html").write_text(warn + head + letter, encoding="utf-8")
-    print(f"이미지 {embedded}장 내장, {kept}장 URL 유지")
+    print(image_line)
     problems = forbidden(letter)
     for line in problems:
         print(f"  고칠 것: {line}")
@@ -239,7 +262,8 @@ def testmail(args):
 def main():
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("pack"); p.add_argument("customer"); p.add_argument("send_date"); p.set_defaults(fn=pack)
+    p = sub.add_parser("pack"); p.add_argument("customer"); p.add_argument("send_date")
+    p.add_argument("--embed-images", action="store_true", help="카드 이미지를 base64 로 내장 (Gmail 은 표시하지 않음)"); p.set_defaults(fn=pack)
     p = sub.add_parser("subscribers"); p.add_argument("csv"); p.add_argument("--apply", action="store_true"); p.set_defaults(fn=subscribers)
     p = sub.add_parser("testmail"); p.add_argument("customer"); p.add_argument("send_date"); p.add_argument("pasted_file"); p.set_defaults(fn=testmail)
     args = parser.parse_args()

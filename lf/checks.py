@@ -22,6 +22,7 @@ from lf.render import IMAGE, LINK, split_front_matter
 DEADLINE = re.compile(r"~\s?(?:(20\d{2})[.\-/])?(\d{1,2})[./\-](\d{1,2})")
 BANNED = ["Claude", "클로드", "AI가", "AI 분석", "인공지능이 작성", "!!"]
 BRACKET = re.compile(r"\[([^\[\]]*)\]")
+DATA_IMAGE = re.compile(r"!\[[^\]]*\]\(data:")  # ![alt](data:image/…): Gmail strips these — host the file instead
 MERGE_LINK = re.compile(r"\[((?:[^\[\]]|\[[^\[\]]*\])+)\]\(\$%[^)\s]+%\$\)")  # [수신거부]($%unsubscribe%$): Stibee fills the href
 PLACEHOLDER_WORDS = ("확인", "미정", "추후", "채울", "입력", "TODO", "TBD", "FIXME", "XXX", "??")
 
@@ -33,6 +34,11 @@ def check_front_matter(meta):
     return []
 
 
+def check_data_images(body):
+    """Image lines whose src is a data: URL. Gmail removes such images (2026-09-21 test), so they must be hosted."""
+    return [f"{number}행: 이미지가 data: URL — Gmail 이 표시하지 않음, 외부 호스팅 주소로 교체" for number, line in enumerate(body.splitlines(), 1) if DATA_IMAGE.search(line)]
+
+
 def check_placeholders(body):
     """Brackets left outside links. '[마감 확인]'-style placeholders must be fixed; other brackets need a look.
 
@@ -42,6 +48,8 @@ def check_placeholders(body):
     for number, line in enumerate(body.splitlines(), 1):
         if IMAGE.match(line.strip()):
             continue
+        if DATA_IMAGE.search(line):
+            continue  # reported by check_data_images
         for match in BRACKET.finditer(MERGE_LINK.sub("", LINK.sub("", line))):
             mark, inner = match.group(0), match.group(1).strip().upper()
             if not inner or any(word in inner for word in PLACEHOLDER_WORDS):
@@ -92,7 +100,7 @@ def main():
     send = dt.date.fromisoformat(str(meta.get("send_date", args.send_date)))
     cutoff = send + dt.timedelta(days=1)
 
-    problems, manual = check_front_matter(meta), []
+    problems, manual = check_front_matter(meta) + check_data_images(body), []
     urls, placed, section = [], [], ""
     for number, line in enumerate(body.splitlines(), 1):
         if line.startswith("## "):

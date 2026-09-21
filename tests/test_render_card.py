@@ -3,9 +3,9 @@ import io
 
 from PIL import Image
 
-from lf.checks import check_front_matter
+from lf.checks import check_data_images, check_front_matter
 from lf.render import Style, blocks
-from lf.stibee import embed_images
+from lf.stibee import embed_images, external_images
 
 STYLE = Style("warm", {})
 CARD = """## 📣 공공도시 소식
@@ -61,9 +61,16 @@ def png_bytes(width=1000, height=1000):
     return buf.getvalue()
 
 
-LETTER = ('<p>x</p><img src="https://postfiles.pstatic.net/a.jpg?type=w773" alt="a" width="240" data-lf="card" style="s">'
+LETTER = ('<p>x</p><img src="https://postfiles.pstatic.net/a.jpg" alt="a" width="240" data-lf="card" style="s">'
           '<img src="https://postfiles.pstatic.net/b.jpg?type=w773" alt="b" width="240" data-lf="card" style="s">'
           '<img src="https://logo.kr/l.png" alt="logo">')
+
+
+def test_pack_default_keeps_external_urls_and_adds_naver_type():
+    out, count = external_images(LETTER)
+    assert count == 2 and "data:image" not in out
+    assert 'src="https://postfiles.pstatic.net/a.jpg?type=w773"' in out and 'src="https://postfiles.pstatic.net/b.jpg?type=w773"' in out
+    assert 'src="https://logo.kr/l.png"' in out
 
 
 def test_pack_embeds_card_images_as_jpeg_data_uri(capsys):
@@ -86,6 +93,11 @@ def test_pack_keeps_url_and_warns_when_download_fails(capsys):
     assert (embedded, kept) == (1, 1)
     assert 'src="https://postfiles.pstatic.net/b.jpg?type=w773"' in out and out.count("data:image/jpeg") == 1
     assert "경고: 이미지 내장 실패, URL 유지" in capsys.readouterr().out
+
+
+def test_checks_flags_data_image_urls():
+    body = "## 코너\n\n![대표 이미지](data:image/jpeg;base64,/9j/4AAQ)\n\n[![대표 이미지](https://img.kr/a.jpg)](https://b.kr)\n"
+    assert check_data_images(body) == ["3행: 이미지가 data: URL — Gmail 이 표시하지 않음, 외부 호스팅 주소로 교체"]
 
 
 def test_checks_flags_missing_front_matter_title():

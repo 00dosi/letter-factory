@@ -65,7 +65,7 @@
 ```
 
 카드는 `display:inline-block` 두 칸(이미지 240px · 글 276px)이라 좁은 화면에서 세로로 쌓이고, Outlook 용 조건부 표가 같이 들어간다.
-`lf.stibee pack`은 카드 이미지를 480px JPEG(품질 80) base64 로 `stibee.html`에 내장한다. 내려받기에 실패한 이미지는 URL 을 유지하고 경고한다.
+`lf.stibee pack`은 카드 이미지를 외부 URL 그대로 둔다(네이버 주소는 `?type=w773` 을 붙인다). Gmail 은 base64(data:) 이미지를 지우므로(2026-09-21 테스트 발송 확인) 내장은 `--embed-images` 를 줄 때만 하고, 그때 경고를 낸다. `lf.checks` 는 원고의 `data:` 이미지 주소를 "고칠 것"으로 잡는다.
 
 ## 도시락레터 템플릿 (`template: dosirak`)
 
