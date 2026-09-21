@@ -3,9 +3,10 @@ label: 도시락레터 (Vol.20 발송본 기준)
 layout: dosirak
 accent: "#000000"
 font: "AppleSDGothic,'apple sd gothic neo','noto sans korean','noto sans cjk kr','nanum gothic','malgun gothic',dotum,arial,sans-serif"
-card_img_width: 300     # image inside a 312px column (6px each side)
-card_col_width: 312
-card_text_width: 312
+# Stibee's drag editor gives an HTML block 600px (630 minus 15px margins): 3px border + 294 + 294 = 600.
+card_img_width: 282     # image inside a 294px column (6px each side)
+card_col_width: 294
+card_text_width: 294
 section: "padding:0 15px;font-family:{font};"
 h2: "margin:0 0 12px;font-family:{font};font-size:18px;font-weight:700;line-height:1.5;color:#000000;"
 h3: "margin:14px 0 8px;font-family:{font};font-size:18px;font-weight:400;line-height:1.5;color:#000000;"

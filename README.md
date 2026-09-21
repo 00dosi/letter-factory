@@ -95,7 +95,7 @@ footer:
     - {icon: https://img2.stibee.com/....png, url: https://www.facebook.com/...}
 ```
 
-카드는 왼쪽 이미지 300px · 오른쪽 글. 두 칸은 inline-block 이라 좁은 화면에서 줄바꿈되고, 줄바꿈된 칸은 가운데 정렬된다(미디어쿼리 없음).
+카드는 스티비 HTML 블록 폭 600px 기준(테두리 3px + 294px 두 칸), 왼쪽 이미지 282px · 오른쪽 글. 두 칸은 inline-block 이라 좁은 화면에서 줄바꿈되고, 줄바꿈된 칸은 가운데 정렬된다(미디어쿼리 없음).
 
 스티비 규칙(help.stibee.com/email/edit/html): HTML 편집기는 `<script> <head> <body> <html> <style> <form> <input> <button> <noscript> <meta> <iframe>` 와 `onclick` 같은 이벤트 속성을 받지 않는다.
 `lf.stibee pack`은 letter.html 에서 본문 표만 남긴 `stibee.html`을 만들고, 금지 태그가 남으면 "고칠 것"으로 보고하며 exit 1.
