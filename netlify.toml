@@ -1,0 +1,5 @@
+# 소개 페이지(site/)만 배포한다. 빌드 없음.
+# production 브랜치 = 정식 배포, main = 브랜치 프리뷰
+[build]
+  publish = "site"
+  command = ""
